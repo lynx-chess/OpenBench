@@ -1,5 +1,72 @@
 # OpenBench
 
+Fork from [AndyGrant/OpenBench](https://github.com/AndyGrant/OpenBench) with the purpose of testing Lynx chess engine.
+
+## Run
+
+Using `docker compose`.
+
+```bash
+docker compose up -d --force-recreate
+docker compose down --remove-orphans --rmi local
+```
+
+PS: don't forget to create an `.env` file or manually set the environment variables for those values where `os.environ.get()` is used in [settings.py](./OpenSite/settings.py), i.e:
+
+```.env
+DJANGO_SECRET_KEY='<your_secret>'
+DJANGO_DEBUG=True
+DJANGO_SECURE_SSL_REDIRECT=False
+DJANGO_SESSION_COOKIE_SECURE=True
+DJANGO_CSRF_COOKIE_SECURE=True
+```
+
+## First time setup
+
+Entering the container created using `docker compose up`.
+
+```bash
+docker exect -it <container-id> bash
+python3 manage.py migrate
+python3 manage.py makemigrations
+python3 manage.py migrate --run-syncdb
+```
+
+## Test/experiment
+
+Using python docker image.
+
+⚠ db/ directory is excluded by default, to avoid messing up with local db, comment if you want to test stuff and persist the db, but probably first edit DB name in settings in [settings.py](./OpenSite/settings.py).
+
+```bash
+# Starts a container, mounts the whole dir as volume (excluding db/) and exposes OB server in localhost:8001
+.\run.sh
+
+# To be run inside of the container
+pip install -r requirements.txt
+python manage.py check --deploy
+
+python3 manage.py migrate
+python3 manage.py makemigrations
+python3 manage.py migrate --run-syncdb
+
+python3 manage.py runserver 0.0.0.0:8000
+
+python3 manage.py createsuperuser
+```
+
+## A few useful/interesting links:
+
+- [Old instance setup instructions](https://web.archive.org/web/20211223142116/https://github.com/AndyGrant/OpenBench)
+
+- [Configuring new engines](https://github.com/AndyGrant/OpenBench/wiki/Configuring-New-Engines)
+
+- [crippa1337 instance](https://github.com/crippa1337/OpenBench)
+
+----
+
+# OpenBench
+
 OpenBench is an open-source Chess Engine Testing Framework for UCI engines. OpenBench provides a lightweight interface and client to facilitate running fixed-game tests as well as SPRT tests to benchmark changes to engines for performance and stability. OpenBench supports [Fischer Random Chess](https://en.wikipedia.org/wiki/Chess960).
 
 OpenBench is the primary testing framework used for the development of [Ethereal.](https://github.com/AndyGrant/Ethereal) The primary instance of OpenBench can be found at [http://chess.grantnet.us](http://chess.grantnet.us/). The Primary instance of OpenBench supports development for

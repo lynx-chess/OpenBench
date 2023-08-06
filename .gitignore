@@ -4,10 +4,12 @@ OpenBench/migrations/*
 
 credentials
 credentials.*
-db.sqlite3
+# db/   See .gitignore inside of it
 
 Scripts/Binaries/*
 Scripts/Networks/*
 Scripts/Repositories/*
 
 Media/*
+
+.env

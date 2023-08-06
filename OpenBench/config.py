@@ -36,7 +36,7 @@ def load_folder_of_configs(*path):
     }
 
 USE_CROSS_APPROVAL          = False # Require a second user to approve patches
-REQUIRE_LOGIN_TO_VIEW       = True  # Block all content but Login and Regiser by default
+REQUIRE_LOGIN_TO_VIEW       = False # Block all content but Login and Regiser by default
 REQUIRE_MANUAL_REGISTRATION = False # Disable the public facing registration page
 
 OPENBENCH_CONFIG = {
@@ -53,13 +53,13 @@ OPENBENCH_CONFIG = {
     },
 
     # Link to the repo on the sidebar, as well as the core files
-    'framework' : 'http://github.com/AndyGrant/OpenBench/',
-    'corefiles' : 'https://raw.githubusercontent.com/AndyGrant/OpenBench/master/CoreFiles',
+    'framework' : 'http://github.com/lynx-chess/OpenBench/',
+    'corefiles' : 'https://raw.githubusercontent.com/lynx-chess/OpenBench/master/CoreFiles',
 
     # Test Configuration. For both SPRT and Fixed Games Tests
     'tests' : {
         'max_games'  : '40000',        # Default for Fixed Games
-        'confidence' : '[0.10, 0.05]', # SPRT Type I/II Confidence
+        'confidence' : '[0.05, 0.05]', # SPRT Type I/II Confidence
     },
 
     # Take a look at Books/books.json

@@ -1,0 +1,10 @@
+version: "2.3"
+services:
+  web:
+    build:
+      context: .
+      target: builder
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./db:/app/db
