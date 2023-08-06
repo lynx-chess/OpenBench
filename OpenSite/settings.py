@@ -37,7 +37,7 @@ PROJECT_PATH  = os.path.abspath(PROJECT_PATH)
 TEMPLATE_PATH = os.path.join(PROJECT_PATH, 'Templates')
 
 MEDIA_URL  = '/Media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'Media')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'mediafiles')
 
 INSTALLED_APPS = [
     'OpenBench',
@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'upload',
 ]
 
 MIDDLEWARE = [
@@ -155,6 +157,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Security
 
-SECURE_SSL_REDIRECT = bool(os.environ.get('DJANGO_SECURE_SSL_REDIRECT', default=0))
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = bool(os.environ.get('DJANGO_SESSION_COOKIE_SECURE', default=0))
 CSRF_COOKIE_SECURE = bool(os.environ.get('DJANGO_CSRF_COOKIE_SECURE', default=0))
+CSRF_TRUSTED_ORIGINS = ["http://localhost:1337"]
