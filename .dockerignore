@@ -2,3 +2,7 @@ db/
 docker-compose.yaml
 run.sh
 Dockerfile
+.env*
+.env
+.env.prod
+.env.dev

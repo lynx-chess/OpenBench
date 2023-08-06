@@ -5,6 +5,7 @@
 #   so the db created inside of the container will be ephimeral
 
 docker run -it --rm \
+  --name test-ob \
   --mount type=bind,src=$PWD,dst=/ob \
   --mount type=volume,dst=/ob/db \
   -w /ob \

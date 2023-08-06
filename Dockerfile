@@ -1,28 +1,23 @@
-# Source: https://github.com/docker/awesome-compose/blob/master/django/app/Dockerfile
-
-# syntax=docker/dockerfile:1.4
-
 FROM --platform=$BUILDPLATFORM python:3.11-slim AS builder
-EXPOSE 8000
+
 WORKDIR /app
+
+# Set environment variables
+# Prevents Python from writing pyc files to disc (equivalent to python -B option)
+ENV PYTHONDONTWRITEBYTECODE 1
+# Prevents Python from buffering stdout and stderr (equivalent to python -u option)
+ENV PYTHONUNBUFFERED 1
+
+# Install dependencies
+RUN pip install --upgrade pip
 COPY requirements.txt /app
 RUN pip3 install -r requirements.txt --no-cache-dir
+
+# Copy project
 COPY . /app
 
+RUN sed -i 's/\r$//g' /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-ENTRYPOINT ["python3"]
-CMD ["manage.py", "runserver", "0.0.0.0:8000"]
-
-FROM builder as dev-envs
-RUN <<EOF
-apk update
-apk add git
-EOF
-
-RUN <<EOF
-addgroup -S docker
-adduser -S --shell /bin/bash --ingroup docker vscode
-EOF
-# install Docker tools (cli, buildx, compose)
-COPY --from=gloursdocker/docker / /
-CMD ["manage.py", "runserver", "0.0.0.0:8000"]
+# run entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -1,7 +1,7 @@
 requests==2.25.1
 Django==4.2.1
 django-htmlmin==0.11.0
-python-dotenv==1.0.0
+gunicorn==21.2.0
 ## Cosmos DB
 # Django==4.1.10
 # djongo==1.3.6

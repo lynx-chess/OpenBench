@@ -7,18 +7,22 @@ Fork from [AndyGrant/OpenBench](https://github.com/AndyGrant/OpenBench) with the
 Using `docker compose`.
 
 ```bash
-docker compose up -d --force-recreate
-docker compose down --remove-orphans --rmi local
+docker compose up -d --build --force-recreate
+# or
+docker-compose -f docker-compose.prod.yaml up -d --build
+
+# To stop it:
+docker compose down -v --remove-orphans --rmi local
 ```
 
-PS: don't forget to create an `.env` file or manually set the environment variables for those values where `os.environ.get()` is used in [settings.py](./OpenSite/settings.py), i.e:
+PS: don't forget to create an `.env` or `.env.prod` file or manually set the environment variables for those values where `os.environ.get()` is used in [settings.py](./OpenSite/settings.py), i.e:
 
 ```.env
 DJANGO_SECRET_KEY='<your_secret>'
-DJANGO_DEBUG=True
-DJANGO_SECURE_SSL_REDIRECT=False
-DJANGO_SESSION_COOKIE_SECURE=True
-DJANGO_CSRF_COOKIE_SECURE=True
+DJANGO_DEBUG=1
+DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_SESSION_COOKIE_SECURE=1
+DJANGO_CSRF_COOKIE_SECURE=1
 ```
 
 ## First time setup
@@ -62,6 +66,8 @@ python3 manage.py createsuperuser
 - [Configuring new engines](https://github.com/AndyGrant/OpenBench/wiki/Configuring-New-Engines)
 
 - [crippa1337 instance](https://github.com/crippa1337/OpenBench)
+
+- [Dockerizing Django with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/#project-setup)
 
 ----
 

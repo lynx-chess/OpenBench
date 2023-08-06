@@ -12,4 +12,7 @@ Scripts/Repositories/*
 
 Media/*
 
-.env
+.env*
+
+staticfiles/
+mediafiles/

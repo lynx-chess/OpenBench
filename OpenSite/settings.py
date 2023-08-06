@@ -10,10 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECURITY WARNING: don't run with debug turned on in production!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '<N0tA$3c73t>')
-DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
+DEBUG = bool(os.environ.get('DJANGO_DEBUG', default=0))
 
 ALLOWED_HOSTS = ['*']
 
@@ -93,7 +90,8 @@ WSGI_APPLICATION = 'OpenSite.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(*[BASE_DIR, 'db', 'lynx-ob.sqlite3']),
+        # 'NAME': os.path.join(*[BASE_DIR, 'db', 'lynx-test-ob.sqlite3']),
+        'NAME': os.path.join(*[BASE_DIR, 'db', os.environ.get('DJANGO_DB_NAME', default='lynx-default-ob.sqlite3')]),
     }
 }
 
@@ -153,9 +151,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Security
 
-SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', '')  != 'False'
-SESSION_COOKIE_SECURE = os.environ.get('DJANGO_SESSION_COOKIE_SECURE', '') != 'False'
-CSRF_COOKIE_SECURE = os.environ.get('DJANGO_CSRF_COOKIE_SECURE', '') != 'False'
+SECURE_SSL_REDIRECT = bool(os.environ.get('DJANGO_SECURE_SSL_REDIRECT', default=0))
+SESSION_COOKIE_SECURE = bool(os.environ.get('DJANGO_SESSION_COOKIE_SECURE', default=0))
+CSRF_COOKIE_SECURE = bool(os.environ.get('DJANGO_CSRF_COOKIE_SECURE', default=0))
