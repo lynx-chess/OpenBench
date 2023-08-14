@@ -9,10 +9,13 @@ Using `docker compose`.
 ```bash
 docker compose up -d --build --force-recreate
 # or
-docker-compose -f docker-compose.prod.yaml up -d --build
+sudo docker compose -f docker-compose.prod.yaml up -d --build && sudo chown -R $(sudo docker compose exec web id -u) ./db && sudo chown -R $(sudo docker compose exec web id -u) ./media
+# Includes workaround of changing owner of media/ so that the app can save files there
 
 # To stop it:
 docker compose down -v --remove-orphans --rmi local
+#or
+sudo docker compose -f docker-compose.prod.yaml down --remove-orphans --rmi local
 ```
 
 PS: don't forget to create an `.env` or `.env.prod` file or manually set the environment variables for those values where `os.environ.get()` is used in [settings.py](./OpenSite/settings.py), i.e:

@@ -7,8 +7,8 @@ from upload.views import image_upload
 
 urlpatterns = [
     path(r'admin/', admin.site.urls),
-    path("", image_upload, name="upload"),
-    # path(r'', include(OpenBench.urls.urlpatterns)),
+    #path(r"upload", image_upload, name="upload"),
+    path(r'', include(OpenBench.urls.urlpatterns)),
 ]
 
 urlpatterns += staticfiles_urlpatterns()

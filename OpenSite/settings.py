@@ -92,7 +92,6 @@ WSGI_APPLICATION = 'OpenSite.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        # 'NAME': os.path.join(*[BASE_DIR, 'db', 'lynx-test-ob.sqlite3']),
         'NAME': os.path.join(*[BASE_DIR, 'db', os.environ.get('DJANGO_DB_NAME', default='lynx-default-ob.sqlite3')]),
     }
 }
@@ -160,4 +159,33 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = bool(os.environ.get('DJANGO_SESSION_COOKIE_SECURE', default=0))
 CSRF_COOKIE_SECURE = bool(os.environ.get('DJANGO_CSRF_COOKIE_SECURE', default=0))
-CSRF_TRUSTED_ORIGINS = ["http://localhost:1337"]
+# CSRF_TRUSTED_ORIGINS = ["http://localhost:1337"]
+CSRF_TRUSTED_ORIGINS = ["https://openbench.lynx-chess.com"]
+
+
+# CSRF_TRUSTED_ORIGINS = [
+#     "http://yourwhitelistedip.com",
+# ]
+
+# CORS_ALLOW_ALL_ORIGINS=False
+
+# CORS_ALLOW_METHODS = [
+# 'DELETE',
+# 'GET',
+# 'OPTIONS',
+# 'PATCH',
+# 'POST',
+# 'PUT',
+# ]
+
+# CORS_ALLOW_HEADERS = [
+#     'accept',
+#     'accept-encoding',
+#     'authorization',
+#     'content-type',
+#     'dnt',
+#     'origin',
+#     'user-agent',
+#     'x-csrftoken',
+#     'x-requested-with',
+# ]

@@ -8,6 +8,7 @@ services:
     command: gunicorn OpenSite.wsgi:application --bind 0.0.0.0:8000
     expose:
       - 8000
+    restart: always
     env_file:
       - ./.env.prod
     volumes:
@@ -17,10 +18,13 @@ services:
   nginx:
     build: ./nginx
     volumes:
+      - ./certs/lynx-chess.com/:/etc/nginx/ssl/live/lynx-chess.com/:ro
       - static_volume:/home/app/web/staticfiles
       - ./media:/home/app/web/media
     ports:
-      - 1337:80
+      - 80:80
+      - 443:443
+    restart: always
     depends_on:
       - web
 
