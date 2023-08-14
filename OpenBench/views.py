@@ -780,10 +780,3 @@ def client_submit_results(request):
 
     # Returns {}, or { 'stop' : True }
     return JsonResponse(OpenBench.utils.update_test(request, machine))
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                                BUSINESS VIEWS                               #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-def buyEthereal(request):
-    return render(request, 'buyEthereal.html')
