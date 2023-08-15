@@ -12,6 +12,7 @@
         "compilers": [
             "dotnet>=8.0.0"
         ],
+        "systems"   : ["Linux", "Windows"],
         "cpuflags": []
     },
     "testmodes": {
