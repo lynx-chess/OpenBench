@@ -657,7 +657,7 @@ def run_bench(engine, outqueue, private_net=None):
 
     try:
         # We may need to set an EvalFile via the UCI Options
-        if not private_net: cmd = ['./' + engine, 'bench']
+        if not private_net: cmd = ['./' + engine, 'bench', 'quit']
         else: cmd = ['./' + engine, 'setoption name EvalFile value %s' % (private_net), 'bench', 'quit']
 
         # Launch the engine and parse output for statistics
@@ -1040,7 +1040,9 @@ def download_engine(arguments, branch, network):
         # Build the engine and drop it into src_path
         print('\nBuilding [%s]' % (final_path))
         output_name = os.path.join(src_path, engine)
+        # print('\nExpected output file: [%s]' % (output_name))
         command     = make_command(config, engine, src_path, network)
+        print(command)
         process     = Popen(command, cwd=src_path, stdout=PIPE, stderr=STDOUT)
         cxx_output  = process.communicate()[0].decode('utf-8')
         print (cxx_output)

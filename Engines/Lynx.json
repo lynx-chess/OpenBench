@@ -1,11 +1,11 @@
 {
     "private": false,
-    "nps": 957158,
+    "nps": 435000,
     "base": "main",
     "source": "https://github.com/lynx-chess/Lynx",
-    "bounds": "[0.00, 10.00]",
+    "bounds": "[0.00, 5.00]",
     "book": "Pohl.epd",
-    "win_adj": "movecount=3 score=400",
+    "win_adj": "movecount=3 score=800",
     "draw_adj": "movenumber=40 movecount=8 score=10",
     "build": {
         "path": "",
