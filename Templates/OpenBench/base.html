@@ -23,18 +23,34 @@
         <script>
             document.addEventListener('DOMContentLoaded', function() {
 
-                var timestamps = document.getElementsByClassName('timestamp');
+                {
+                    var timestamps = document.getElementsByClassName('timestamp');
 
-                var options = {
-                    year   : 'numeric', month  : '2-digit',
-                    day    : '2-digit', hour   : '2-digit',
-                    minute : '2-digit', second : '2-digit',
-                    hour12 : false,
-                };
+                    var options = {
+                        year   : 'numeric', month  : '2-digit',
+                        day    : '2-digit', hour   : '2-digit',
+                        minute : '2-digit', second : '2-digit',
+                        hour12 : false,
+                    };
 
-                for (var i = 0; i < timestamps.length; i++) {
-                    var date = new Date(1000 * timestamps[i].innerHTML);
-                    timestamps[i].innerHTML = date.toLocaleString(undefined, options);
+                    for (var i = 0; i < timestamps.length; i++) {
+                        var date = new Date(1000 * timestamps[i].innerHTML);
+                        timestamps[i].innerHTML = date.toLocaleString(undefined, options);
+                    }
+                }
+
+                {
+                    var datestamps = document.getElementsByClassName('datestamp');
+
+                    var options = {
+                        month  : 'short',
+                        day    : '2-digit',
+                    };
+
+                    for (var i = 0; i < datestamps.length; i++) {
+                        var date = new Date(1000 * datestamps[i].innerHTML);
+                        datestamps[i].innerHTML = date.toLocaleString(undefined, options);
+                    }
                 }
 
             }, false);
@@ -70,6 +86,7 @@
             <ul>
                 <li class="header">Actions</li>
                 <li><a href="/newTest"><i class="fa-solid fa-plus fa-fw"></i> Create Test</a></li>
+                <li><a href="/newTune"><i class="fa-solid fa-vial fa-fw"></i> Create Tune</a></li>
                 <li><a href="/newNetwork"><i class="fa-solid fa-upload fa-fw"></i> Upload Net</a></li>
             </ul>
 
@@ -88,7 +105,7 @@
 
             <ul>
                 <li class="header">Support</li>
-                <li><a href="{{config.framework}}"><i class="fa-brands fa-github fa-fw"></i> OpenBench</a></li>
+                <li><a href="{{config.client_repo_url}}"><i class="fa-brands fa-github fa-fw"></i> OpenBench</a></li>
                 <li><a href="https://discord.gg/9MVg7fBTpM"><i class="fa-brands fa-discord fa-fw"></i> Discord</a></li>
             </ul>
 

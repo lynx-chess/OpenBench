@@ -65,13 +65,24 @@ class Result(Model):
 
     test     = ForeignKey('Test', PROTECT, related_name='test')
     machine  = ForeignKey('Machine', PROTECT, related_name='machine')
+    updated  = DateTimeField(auto_now=True)
+
+    # Trinomial Distributions
+    losses = IntegerField(default=0)
+    draws  = IntegerField(default=0)
+    wins   = IntegerField(default=0)
+
+    # Pentanomial Distributions
+    LL = IntegerField(default=0)
+    LD = IntegerField(default=0)
+    DD = IntegerField(default=0)
+    DW = IntegerField(default=0)
+    WW = IntegerField(default=0)
+
+    # Overall collection of Results
     games    = IntegerField(default=0)
-    wins     = IntegerField(default=0)
-    losses   = IntegerField(default=0)
-    draws    = IntegerField(default=0)
     crashes  = IntegerField(default=0)
     timeloss = IntegerField(default=0)
-    updated  = DateTimeField(auto_now=True)
 
     def __str__(self):
         return '{0} {1}'.format(self.test.dev.name, self.machine.__str__())
@@ -79,8 +90,12 @@ class Result(Model):
 class Test(Model):
 
     # Misc information
-    author    = CharField(max_length=64)
-    book_name = CharField(max_length=32)
+    author      = CharField(max_length=64)
+    upload_pgns = CharField(max_length=16, default='FALSE')
+
+    # Opening book settings
+    book_name  = CharField(max_length=32)
+    book_index = IntegerField(default=1)
 
     # Dev Engine, and all of its settings
     dev              = ForeignKey('Engine', PROTECT, related_name='dev')
@@ -101,7 +116,6 @@ class Test(Model):
     base_time_control = CharField(max_length=32)
 
     # Changable Test Parameters
-    report_rate   = IntegerField(default=8)
     workload_size = IntegerField(default=32)
     priority      = IntegerField(default=0)
     throughput    = IntegerField(default=0)
@@ -122,13 +136,22 @@ class Test(Model):
     currentllr  = FloatField(default=0.0) # SPRT
     upperllr    = FloatField(default=0.0) # SPRT
     max_games   = IntegerField(default=0) # GAMES
+    spsa        = JSONField(default=dict, blank=True, null=True) # SPSA
 
-    # Summary of all associated result objects
-    games       = IntegerField(default=0)
-    wins        = IntegerField(default=0)
-    draws       = IntegerField(default=0)
-    losses      = IntegerField(default=0)
-    error       = BooleanField(default=False)
+    # Collection of all individual Result() objects
+    games  = IntegerField(default=0) # Overall
+    losses = IntegerField(default=0) # Trinomial
+    draws  = IntegerField(default=0) # Trinomial
+    wins   = IntegerField(default=0) # Trinomial
+    LL     = IntegerField(default=0) # Pentanomial
+    LD     = IntegerField(default=0) # Pentanomial
+    DD     = IntegerField(default=0) # Pentanomial
+    DW     = IntegerField(default=0) # Pentanomial
+    WW     = IntegerField(default=0) # Pentanomial
+
+    # Switching all future tests to Pentanomial
+    use_tri   = BooleanField(default=False)
+    use_penta = BooleanField(default=True)
 
     # All status flags associated with the test
     passed      = BooleanField(default=False)
@@ -137,6 +160,7 @@ class Test(Model):
     deleted     = BooleanField(default=False)
     approved    = BooleanField(default=False)
     awaiting    = BooleanField(default=False)
+    error       = BooleanField(default=False)
 
     # Datetime house keeping for meta data
     creation    = DateTimeField(auto_now_add=True)
@@ -161,12 +185,26 @@ class LogEvent(Model):
 
 class Network(Model):
 
-    default   = BooleanField(default=False)
-    sha256    = CharField(max_length=8)
-    name      = CharField(max_length=64)
-    engine    = CharField(max_length=64)
-    author    = CharField(max_length=64)
-    created   = DateTimeField(auto_now_add=True)
+    default     = BooleanField(default=False)
+    was_default = BooleanField(default=False)
+    sha256      = CharField(max_length=8)
+    name        = CharField(max_length=64)
+    engine      = CharField(max_length=64)
+    author      = CharField(max_length=64)
+    created     = DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return '[{}] {} ({})'.format(self.engine, self.name, self.sha256)
+
+class PGN(Model):
+
+    test_id    = IntegerField(default=0)
+    result_id  = IntegerField(default=0)
+    book_index = IntegerField(default=0)
+    processed  = BooleanField(default=False)
+
+    def __str__(self):
+        return self.filename()
+
+    def filename(self):
+        return '%s.%s.%s.pgn.bz2' % (self.test_id, self.result_id, self.book_index)

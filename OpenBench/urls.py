@@ -48,11 +48,15 @@ urlpatterns = [
     django.urls.path(r'machines/', OpenBench.views.machines),
     django.urls.path(r'machines/<int:machineid>/', OpenBench.views.machines),
 
-    # Links for viewing and managing tests (maintain Legacy)
+    # Links for viewing and managing tests
     django.urls.path(r'test/<int:id>/', OpenBench.views.test),
-    django.urls.path(r'viewTest/<int:id>/', OpenBench.views.test),
     django.urls.path(r'test/<int:id>/<str:action>', OpenBench.views.test),
     django.urls.path(r'newTest/', OpenBench.views.create_test),
+
+    # Links for viewing and managing tunes
+    django.urls.path(r'tune/<int:id>/', OpenBench.views.tune),
+    django.urls.path(r'tune/<int:id>/<str:action>', OpenBench.views.tune),
+    django.urls.path(r'newTune/', OpenBench.views.create_tune),
 
     # Links for viewing and managing Networks
     django.urls.path(r'networks/', OpenBench.views.networks),
@@ -65,7 +69,7 @@ urlpatterns = [
     django.urls.path(r'scripts/', OpenBench.views.scripts),
 
     # Links for the Client to work with the Server
-    django.urls.path(r'clientGetFiles/', OpenBench.views.client_get_files),
+    django.urls.path(r'clientVersionRef/', OpenBench.views.client_version_ref),
     django.urls.path(r'clientGetBuildInfo/', OpenBench.views.client_get_build_info),
     django.urls.path(r'clientWorkerInfo/', OpenBench.views.client_worker_info),
     django.urls.path(r'clientGetWorkload/', OpenBench.views.client_get_workload),
@@ -74,6 +78,16 @@ urlpatterns = [
     django.urls.path(r'clientSubmitNPS/', OpenBench.views.client_submit_nps),
     django.urls.path(r'clientSubmitError/', OpenBench.views.client_submit_error),
     django.urls.path(r'clientSubmitResults/', OpenBench.views.client_submit_results),
+    django.urls.path(r'clientHeartbeat/', OpenBench.views.client_heartbeat),
+    django.urls.path(r'clientSubmitPGN/', OpenBench.views.client_submit_pgn),
+
+    # Nice endpoints, which can be hit from the website or with credentials cleanly
+    django.urls.path(r'api/config/', OpenBench.views.api_configs),
+    django.urls.path(r'api/config/<str:engine>/', OpenBench.views.api_configs),
+    django.urls.path(r'api/networks/<str:engine>/', OpenBench.views.api_networks),
+    django.urls.path(r'api/networks/<str:engine>/<str:identifier>/', OpenBench.views.api_network_download),
+    django.urls.path(r'api/buildinfo/', OpenBench.views.api_build_info),
+    django.urls.path(r'api/pgns/<int:pgn_id>/', OpenBench.views.api_pgns),
 
     # Redirect anything else to the Index
     django.urls.path(r'', OpenBench.views.index),

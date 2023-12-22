@@ -27,21 +27,38 @@ import django.contrib.auth
 import OpenBench.config
 import OpenBench.utils
 
+from OpenBench.workloads.get_workload import get_workload
+from OpenBench.workloads.create_workload import create_workload
+from OpenBench.workloads.verify_workload import verify_workload
+from OpenBench.workloads.modify_workload import modify_workload
+
 from OpenBench.config import OPENBENCH_CONFIG
+from OpenSite.settings import PROJECT_PATH
 
 from OpenBench.models import *
 from django.contrib.auth.models import User
 from OpenSite.settings import MEDIA_ROOT
 
+from django.db import transaction
 from django.db.models import F, Q
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import FileSystemStorage
 from django.core.files.base import ContentFile
+from django.utils import timezone
+
+from wsgiref.util import FileWrapper
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                              GENERAL UTILITIES                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+ERROR_MESSAGES = {
+    'disabled'            : 'Account has not been enabled. Contact an Administrator',
+    'fakeuser'            : 'This is not a real OpenBench User. Create an OpenBench account',
+    'requires_login'      : 'All pages require a user login to access',
+    'manual_registration' : 'Registration can only be done via an Administrator',
+}
 
 class UnableToAuthenticate(Exception):
     pass
@@ -51,9 +68,9 @@ def render(request, template, content={}, always_allow=False, error=None, warnin
     data = content.copy()
     data.update({ 'config' : OPENBENCH_CONFIG })
 
-    if OpenBench.config.REQUIRE_LOGIN_TO_VIEW:
+    if OPENBENCH_CONFIG['require_login_to_view']:
         if not request.user.is_authenticated and not always_allow:
-            return redirect(request, '/login/',  error=data['config']['error']['requires_login'])
+            return redirect(request, '/login/',  error=ERROR_MESSAGES['requires_login'])
 
     if request.user.is_authenticated:
 
@@ -61,10 +78,10 @@ def render(request, template, content={}, always_allow=False, error=None, warnin
         data.update({'profile' : profile.first()})
 
         if profile.first() and not profile.first().enabled:
-            request.session['error_message'] = data['config']['error']['disabled']
+            request.session['error_message'] = ERROR_MESSAGES['disabled']
 
         elif request.user.is_authenticated and not profile.first():
-            request.session['error_message'] = data['config']['error']['fakeuser']
+            request.session['error_message'] = ERROR_MESSAGES['fakeuser']
 
     if error:
         request.session['error_message'] = error
@@ -121,9 +138,9 @@ def authenticate(request, requireEnabled=False):
 def register(request):
 
     if request.method == 'GET':
-        if not OpenBench.config.REQUIRE_MANUAL_REGISTRATION:
+        if not OPENBENCH_CONFIG['require_manual_registration']:
             return render(request, 'register.html', always_allow=True)
-        return redirect(request, '/login/', error=OPENBENCH_CONFIG['error']['manual_registration'])
+        return redirect(request, '/login/', error=ERROR_MESSAGES['manual_registration'])
 
     if request.POST['password1'] != request.POST['password2']:
         return redirect(request, '/register/', error='Passwords do not match')
@@ -382,7 +399,7 @@ def search(request):
         filtered.append(test)
 
     error = 'No matching tests found' if not len(filtered) else None
-    return render(request, 'search.html', { 'tests' : filtered }, error=error)
+    return render(request, 'search.html', { 'tests' : reversed(filtered) }, error=error)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                           GENERAL DATA TABLE VIEWS                          #
@@ -437,81 +454,45 @@ def machines(request, machineid=None):
 
 def test(request, id, action=None):
 
+    # Request is to modify or interact with the Test
+    if action != None:
+        return modify_workload(request, id, action)
+
+    # Verify that the Test id exists
     if not (test := Test.objects.filter(id=id).first()):
-        return django.http.HttpResponseRedirect('/index/')
+        return redirect(request, '/index/', error='No such Test exists')
 
-    if action not in ['APPROVE', 'RESTART', 'STOP', 'DELETE', 'MODIFY']:
-        data = { 'test' : test, 'results': Result.objects.filter(test=test) }
-        return render(request, 'test.html', data)
+    # Verify that it is indeed a Test and not a Tune
+    if test.test_mode != 'SPRT' and test.test_mode != 'GAMES':
+        return redirect(request, '/index/', error='You are trying to view a Tune not Test')
 
-    if not request.user.is_authenticated:
-        return redirect(request, '/login/', error='Only users may interact with tests')
+    # Package everything up and display the test
+    data = { 'test' : test, 'results': Result.objects.filter(test=test) }
+    return render(request, 'test.html', data)
 
-    profile = Profile.objects.get(user=request.user)
-    if not profile.approver and test.author != request.user.username:
-        return redirect(request, '/index/', error='You cannot interact with another user\'s test')
+def tune(request, id, action=None):
 
-    if action == 'APPROVE':
-        if test.author == request.user.username and not user.is_superuser:
-            return redirect(request, '/index/', error='You cannot approve your own test')
+    # Request is to modify or interact with the Tune
+    if action != None:
+        return modify_workload(request, id, action)
 
-    if action == 'APPROVE': test.approved =  True; test.save()
-    if action == 'RESTART': test.finished = False; test.save()
-    if action == 'STOP'   : test.finished =  True; test.save()
-    if action == 'DELETE' : test.deleted  =  True; test.save()
+    # Verify that the Tune id exists
+    if not (tune := Test.objects.filter(id=id).first()):
+        return redirect(request, '/index/', error='No such Tune exists')
 
-    if action == 'MODIFY':
-        test.priority      = int(request.POST['priority'])
-        test.throughput    = max(1, int(request.POST['throughput']))
-        test.report_rate   = max(1, int(request.POST['report_rate']))
-        test.workload_size = max(1, int(request.POST['workload_size']))
-        test.save()
+    # Verify that it is indeed a Tune and not a Test
+    if tune.test_mode == 'SPRT' or tune.test_mode == 'GAMES':
+        return redirect(request, '/index/', error='You are trying to view a Test not Tune')
 
-    action += " P=%d TP=%d RR=%d WS=%d" % (test.priority, test.throughput, test.report_rate, test.workload_size)
-    LogEvent.objects.create(author=request.user.username, summary=action, log_file='', test_id=test.id)
-    return django.http.HttpResponseRedirect('/index/')
+    # Package everything up and display the Tune
+    data = { 'test' : tune, 'results': Result.objects.filter(test=tune) }
+    return render(request, 'tune.html', data)
 
 def create_test(request):
+    return create_workload(request, 'TEST')
 
-    if not request.user.is_authenticated:
-        return redirect(request, '/login/', error='Only enabled users can create tests')
-
-    if not Profile.objects.get(user=request.user).enabled:
-        return redirect(request, '/login/', error='Only enabled users can create tests')
-
-    if request.method == 'GET':
-        data = { 'networks' : list(Network.objects.all().values()) }
-        return render(request, 'create_test.html', data)
-
-    test, errors = OpenBench.utils.create_new_test(request)
-    if errors != [] and errors != None:
-        return redirect(request, '/newTest/', error='\n'.join(errors))
-
-    if warning := OpenBench.utils.branch_is_out_of_date(test):
-        warning = 'Consider Rebasing: Dev (%s) appears behind Base (%s)' % (test.dev.name, test.base.name)
-
-    username = request.user.username
-    profile  = Profile.objects.get(user=request.user)
-    LogEvent.objects.create(author=username, summary='CREATE', log_file='', test_id=test.id)
-
-    approved = Test.objects.filter(approved=True)
-    A = approved.filter( dev__sha=test.dev.sha).exists()
-    B = approved.filter(base__sha=test.dev.sha).exists()
-    C = approved.filter( dev__sha=test.base.sha).exists()
-    D = approved.filter(base__sha=test.base.sha).exists()
-
-    if (A or B) and (C or D):
-        test.approved = True; test.save()
-        action = "AUTOAPP P={0} TP={1}".format(test.priority, test.throughput)
-        LogEvent.objects.create(author=username, summary=action, log_file='', test_id=test.id)
-
-    elif not OpenBench.config.USE_CROSS_APPROVAL and profile.approver:
-        test.approved = True; test.save()
-        action = "APPROVE P={0} TP={1}".format(test.priority, test.throughput)
-        LogEvent.objects.create(author=username, summary=action, log_file='', test_id=test.id)
-
-    return redirect(request, '/index/', warning=warning)
-
+def create_tune(request):
+    return create_workload(request, 'TUNE')
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                          NETWORK MANAGEMENT VIEWS                           #
@@ -520,7 +501,7 @@ def create_test(request):
 def networks(request, engine=None, action=None, name=None, client=False):
 
     # Without an identifier and a valid action, all we can do is view the list
-    if not name or action.upper() not in ['UPLOAD', 'DEFAULT', 'DELETE', 'DOWNLOAD']:
+    if not name or action.upper() not in ['UPLOAD', 'DEFAULT', 'DELETE', 'DOWNLOAD', 'EDIT']:
         networks = Network.objects.all()
         if engine and engine in OPENBENCH_CONFIG['engines'].keys():
             networks = networks.filter(engine=engine)
@@ -543,6 +524,7 @@ def networks(request, engine=None, action=None, name=None, client=False):
         'DEFAULT'  : OpenBench.utils.network_default,
         'DELETE'   : OpenBench.utils.network_delete,
         'DOWNLOAD' : OpenBench.utils.network_download,
+        'EDIT'     : OpenBench.utils.network_edit,
     }
 
     # Update the Network, if we can find one for the given name/sha256
@@ -587,33 +569,42 @@ def scripts(request):
 #                              CLIENT HOOK VIEWS                              #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-def client_verify_worker(request):
+def verify_worker(function):
 
-    ## Returns the machine, or None. Returns a JsonResponse or None.
-    ## Presence of a JsonResponse indicates a failure to verify
+    def wrapped_verify_worker(*args, **kwargs):
 
-    # Get the machine, assuming it exists
-    try: machine = Machine.objects.get(id=int(request.POST['machine_id']))
-    except: return None, JsonResponse({ 'error' : 'Bad Machine Id' })
+        # Get the machine, assuming it exists
+        try: machine = Machine.objects.get(id=int(args[0].POST['machine_id']))
+        except: return JsonResponse({ 'error' : 'Bad Machine Id' })
 
-    # Ensure the Client is using the same version as the Server
-    if machine.info['client_ver'] != OPENBENCH_CONFIG['client_version']:
-        expected_ver = OPENBENCH_CONFIG['client_version']
-        return machine, JsonResponse({ 'error' : 'Bad Client Version: Expected %s' % (expected_ver)})
+        # Ensure the Client is using the same version as the Server
+        if machine.info['client_ver'] != OPENBENCH_CONFIG['client_version']:
+            expected_ver = OPENBENCH_CONFIG['client_version']
+            return JsonResponse({ 'error' : 'Bad Client Version: Expected %d' % (expected_ver)})
 
-    # Use the secret token as our soft verification
-    if machine.secret != request.POST['secret']:
-        return machine, JsonResponse({ 'error' : 'Invalid Secret Token' })
+        # Use the secret token as our soft verification
+        if machine.secret != args[0].POST['secret']:
+            return JsonResponse({ 'error' : 'Invalid Secret Token' })
 
-    return machine, None
+        # Otherwise, carry on, and pass along the machine
+        return function(*args, machine)
+
+    return wrapped_verify_worker
 
 @csrf_exempt
-def client_get_files(request):
+def client_version_ref(request):
 
-    ## Location of static compile of Cutechess for Windows and Linux.
-    ## OpenBench does not serve these files, but points to a repo ideally.
+    # Verify the User's credentials
+    try: user = authenticate(request, True)
+    except UnableToAuthenticate:
+        return JsonResponse({ 'error' : 'Bad Credentials' })
 
-    return JsonResponse( {'location' : OPENBENCH_CONFIG['corefiles'] })
+    # Enough information to download the right Client
+    return JsonResponse({
+        'client_version'  : OPENBENCH_CONFIG['client_version' ],
+        'client_repo_url' : OPENBENCH_CONFIG['client_repo_url'],
+        'client_repo_ref' : OPENBENCH_CONFIG['client_repo_ref'],
+    })
 
 @csrf_exempt
 def client_get_build_info(request):
@@ -623,7 +614,7 @@ def client_get_build_info(request):
 
     data = {}
     for engine, config in OPENBENCH_CONFIG['engines'].items():
-        data[engine] = config['build']
+        data[engine] = config['build'].copy()
         data[engine]['private'] = config['private']
     return JsonResponse(data)
 
@@ -677,16 +668,6 @@ def client_worker_info(request):
     return JsonResponse({ 'machine_id' : machine.id, 'secret' : machine.secret })
 
 @csrf_exempt
-def client_get_workload(request):
-
-    # Pass along any error messages if they appear
-    machine, response = client_verify_worker(request)
-    if response != None: return response
-
-    # Contains keys 'workload', otherwise none
-    return JsonResponse(OpenBench.utils.get_workload(machine))
-
-@csrf_exempt
 def client_get_network(request, engine, name):
 
     # Verify the User's credentials
@@ -697,11 +678,13 @@ def client_get_network(request, engine, name):
     return networks(request, engine, 'DOWNLOAD', name, client=True)
 
 @csrf_exempt
-def client_wrong_bench(request):
+@verify_worker
+def client_get_workload(request, machine):
+    return JsonResponse(get_workload(machine))
 
-    # Pass along any error messages if they appear
-    machine, response = client_verify_worker(request)
-    if response != None: return response
+@csrf_exempt
+@verify_worker
+def client_wrong_bench(request, machine):
 
     # Find and stop the test with the bad bench
     if int(request.POST['wrong']) != 0:
@@ -724,11 +707,8 @@ def client_wrong_bench(request):
     return JsonResponse({})
 
 @csrf_exempt
-def client_submit_nps(request):
-
-    # Pass along any error messages if they appear
-    machine, response = client_verify_worker(request)
-    if response != None: return response
+@verify_worker
+def client_submit_nps(request, machine):
 
     # Update the NPS counters for the GUI views
     machine.mnps      = float(request.POST['nps'     ]) / 1e6;
@@ -740,21 +720,13 @@ def client_submit_nps(request):
     return JsonResponse({})
 
 @csrf_exempt
-def client_submit_error(request):
+@verify_worker
+def client_submit_error(request, machine):
 
     ## Report an error when working on test. This could be one three kinds.
     ## 1. Error building the engine. Does not compile, for whatever reason.
     ## 2. Error getting the artifacts. Does not exist, lacks credentials.
     ## 3. Error during actual gameplay. Timeloss, Disconnect, Crash, etc.
-
-    # Pass along any error messages if they appear
-    machine, response = client_verify_worker(request)
-    if response != None: return response
-
-    # Flag the Test as having an error except for time losses
-    test = Test.objects.get(id=int(request.POST['test_id']))
-    if 'loses on time' not in request.POST['error']:
-        test.error = True; test.save()
 
     # Log the Error into the Events table
     event = LogEvent.objects.create(
@@ -772,11 +744,174 @@ def client_submit_error(request):
     return JsonResponse({})
 
 @csrf_exempt
-def client_submit_results(request):
-
-    # Pass along any error messages if they appear
-    machine, response = client_verify_worker(request)
-    if response != None: return response
+@verify_worker
+def client_submit_results(request, machine):
 
     # Returns {}, or { 'stop' : True }
     return JsonResponse(OpenBench.utils.update_test(request, machine))
+
+@csrf_exempt
+@verify_worker
+def client_heartbeat(request, machine):
+
+    # Force a refresh of the updated timestamp
+    machine.save()
+
+    # Include a 'stop' header iff the test was finished
+    test = Test.objects.get(id=int(request.POST['test_id']))
+    return JsonResponse([{}, { 'stop' : True }][test.finished])
+
+@csrf_exempt
+@verify_worker
+def client_submit_pgn(request, machine):
+
+    with transaction.atomic():
+
+        # Format: test.result.book-index.pgn.bz2
+        pgn            = PGN()
+        pgn.test_id    = int(request.POST['test_id']   )
+        pgn.result_id  = int(request.POST['result_id'] )
+        pgn.book_index = int(request.POST['book_index'])
+        pgn.save()
+
+        # Save the .pgn.bz2 to /Media/
+        FileSystemStorage().save(pgn.filename(), ContentFile(request.FILES['file'].read()))
+
+    return JsonResponse({})
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                                                                             #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+def api_response(data):
+    return HttpResponse(json.dumps(data, indent=4), content_type='application/json')
+
+@csrf_exempt
+def api_authenticate(request, require_enabled=False):
+
+    try:
+
+        # Don't require a login for Public frameworks
+        if not require_enabled and not OPENBENCH_CONFIG['require_login_to_view']:
+            return True
+
+        # Request is made from a browser, and is already logged in
+        if request.user.is_authenticated:
+            return not require_enabled or bool(Profile.objects.get(user=request.user).enabled)
+
+        # Request might be made from the command line. Check the headers
+        user = django.contrib.auth.authenticate(
+            username=request.POST['username'], password=request.POST['password'])
+        return not require_enabled or Profile.objects.get(user=user).enabled
+
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return False
+
+@csrf_exempt
+def api_configs(request, engine=None):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    if engine == None:
+        engines = list(OPENBENCH_CONFIG['engines'].keys())
+        books   = OPENBENCH_CONFIG['books']
+        return api_response({ 'engines' : engines, 'books' : books })
+
+    if engine in OPENBENCH_CONFIG['engines'].keys():
+        return api_response(OPENBENCH_CONFIG['engines'][engine])
+
+    return api_response({ 'error' : 'Engine not found. Check /api/config/ for a full list' })
+
+@csrf_exempt
+def api_networks(request, engine):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    if engine in OPENBENCH_CONFIG['engines'].keys():
+
+        if not (network := Network.objects.filter(engine=engine, default=True).first()):
+            return api_response({ 'error' : 'Engine does not have a default Network' })
+
+        default = {
+            'sha'    : network.sha256, 'name'    : network.name,
+            'author' : network.author, 'created' : str(network.created) }
+
+        networks = [
+          { 'sha'    : network.sha256, 'name'    : network.name,
+            'author' : network.author, 'created' : str(network.created) }
+            for network in Network.objects.filter(engine=engine) ]
+
+        return api_response({ 'default' : default, 'networks' : networks })
+
+    else:
+        return api_response({ 'error' : 'Engine not found. Check /api/config/ for a full list' })
+
+@csrf_exempt
+def api_network_download(request, engine, identifier):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    if not api_authenticate(request, require_enabled=True):
+        return api_response({ 'error' : 'API requires authentication for this endpoint' })
+
+    if (network := Network.objects.filter(engine=engine, sha256=identifier).first()):
+        return OpenBench.utils.network_download(request, engine, network)
+
+    if (network := Network.objects.filter(engine=engine, name=identifier).first()):
+        return OpenBench.utils.network_download(request, engine, network)
+
+    return api_response({ 'error' : 'Engine not found. Check /api/config/ for a full list' })
+
+@csrf_exempt
+def api_build_info(request):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    data = {}
+    for engine, config in OPENBENCH_CONFIG['engines'].items():
+        data[engine] = config
+
+    for network in Network.objects.filter(default=True):
+
+        if network.engine not in data:
+            continue
+
+        data[network.engine]['network'] = {
+            'sha'     : network.sha256,
+            'name'    : network.name,
+            'author'  : network.author,
+            'created' : str(network.created)
+        }
+
+    return api_response(data)
+
+@csrf_exempt
+def api_pgns(request, pgn_id):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    # Possible to request a PGN that does not exist
+    pgn_path = FileSystemStorage('Media/PGNs').path('%d.pgn.tar' % (pgn_id))
+    if not os.path.exists(pgn_path):
+        return api_response({ 'error' : 'Unable to find PGN for Workload #%d' % (pgn_id) })
+
+    # Craft the download HTML response
+    fwrapper = FileWrapper(open(pgn_path, 'rb'), 8192)
+    response = FileResponse(fwrapper, content_type='application/octet-stream')
+
+    # Set all headers and return response
+    response['Expires'] = -1
+    response['Content-Length'] = os.path.getsize(pgn_path)
+    response['Content-Disposition'] = 'attachment; filename=%d.pgn.tar' % (pgn_id)
+    return response
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                                BUSINESS VIEWS                               #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

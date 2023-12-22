@@ -1,11 +1,12 @@
-#!/bin/sh
 
-rm -rf __pycache__/
-rm -rf Engines/
-rm -rf Networks/
 rm -rf Books/
-rm -rf PGNs/
-rm -rf tmp/
-rm -rf *.dll
-rm -rf cutechess*
-rm -rf machine.txt
+rm -rf Engines/
+rm -rf PGNS/
+rm -rf Networks/
+rm -rf __pycache__/
+
+rm machine.txt
+rm requirements.txt
+rm worker.py
+rm cutechess-ob
+rm cutechess-ob.exe

@@ -13,6 +13,7 @@ services:
       - ./.env.prod
     volumes:
       - ./db:/home/app/web/db
+      - ./OpenBench/migrations:/home/app/web/OpenBench/migrations
       - static_volume:/home/app/web/staticfiles
       - ./media:/home/app/web/media
   nginx:

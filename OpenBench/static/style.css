@@ -30,7 +30,7 @@ body, html, main{
 
 #sidebar {
     padding: 60px 16px 16px 16px;
-    flex-basis: calc(min(300px, max(200px, 15%)));
+    flex-basis: calc(min(300px, max(200px, 10%)));
 }
 
 #content-parent{
@@ -163,7 +163,7 @@ body, html, main{
 
 /* Table Spacer for chaining Tables as a hack */
 
-#content .table-spacer th {
+#content .table-spacer th, #content .table-spacer tr {
     background-color: var(--color1);
     height: 1rem;
 }
@@ -184,15 +184,30 @@ body, html, main{
     padding: 10px 12px 6px 12px;
 }
 
+#content .anchor-container {
+    display: flex;
+    justify-content: space-between;
+}
+
+#content .anchor-container > .anchorbutton {
+    flex: 1;
+    margin-right: 4px;
+}
+
+#content .anchor-container > .anchorbutton:last-child {
+    margin-right: 0px;
+}
+
 #content .anchorbutton {
     border-radius: 4px;
-    padding: 8px 8px 6px;
+    padding: 8px 0px 6px;
     border-color: transparent;
     color: var(--color-font1);
     display: inline-block;
     text-align: center;
     transition: background-color 0.3s ease;
     font-family: "Courier Prime", serif;
+    font-size: 13px;
     cursor: pointer;
 }
 
@@ -263,11 +278,11 @@ body, html, main{
 #content .statblock {
     font-size: 13px;
     color: black;
-    line-height: 96%;
+    line-height: 92%;
     background-color: #CCCCCC;
     font-family: "Courier New";
     border-radius: 4px;
-    padding: 9px 10px 6px;
+    padding: 7px 10px 4px;
 }
 
 #content .statblock-green {
@@ -347,9 +362,24 @@ td pre {
 
 #content .default-network {
     color: var(--color-font3);
+    transform: scale(1.10);
+}
+
+#content .was-default-network {
+    color: #EFF891;
+    transform: scale(0.90);
 }
 
 #content .non-default-network {
     color: var(--color-font1);
-    transform: scale(0.75);
+    transform: scale(0.70);
+}
+
+
+#content .numeric {
+    text-align: right;
+}
+
+#content .branch_name {
+    font-style: italic;
 }
