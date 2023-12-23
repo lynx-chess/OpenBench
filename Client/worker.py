@@ -1077,7 +1077,8 @@ def complete_workload(config):
     # Scale using the base factor only, in the event of a cross-engine test
     dev_engine    = config.workload['test']['dev' ]['engine']
     base_engine   = config.workload['test']['base']['engine']
-    scale_factor  = base_factor if dev_engine != base_engine else avg_factor
+    # scale_factor  = base_factor if dev_engine != base_engine else avg_factor
+    scale_factor  = 1
 
     # Server knows how many copies of Cutechess we should run
     cutechess_cnt   = config.workload['distribution']['cutechess-count']
