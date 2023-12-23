@@ -1,0 +1,1 @@
+python3 .\Scripts\bench_all.py -S https://openbench.lynx-chess.com/ --username eduherminio --password "<pwd>" --threads 8 --sets 1
