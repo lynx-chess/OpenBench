@@ -74,7 +74,7 @@ def shortStatBlock(test):
         lower, elo, upper = OpenBench.stats.ELO([test.losses, test.draws, test.wins])
         top_line = 'Elo: %0.2f +- %0.2f (95%%) [N=%d]' % (elo, max(upper - elo, elo - lower), test.max_games)
 
-    tri_line   = 'Games: %d W: %d L: %d D: %d' % (test.games, test.wins, test.losses, test.draws)
+    tri_line   = '%d games: +%d -%d =%d' % (test.games, test.wins, test.losses, test.draws)
     penta_line = 'Pntml(0-2): %d, %d, %d, %d, %d' % (test.LL, test.LD, test.DD, test.DW, test.WW)
 
     if test.use_penta:
@@ -97,6 +97,7 @@ def longStatBlock(test):
     lower, elo, upper = OpenBench.stats.ELO([test.losses, test.draws, test.wins])
 
     lines = [
+        'Test  | %s' % (prettyDevName(test)),
         'Elo   | %0.2f +- %0.2f (95%%)' % (elo, max(upper - elo, elo - lower)),
         '%-5s | %s Threads=%d Hash=%dMB' % (test_type, timecontrol, threads, hashmb),
     ]
@@ -105,7 +106,7 @@ def longStatBlock(test):
         lines.append('LLR   | %0.2f (%0.2f, %0.2f) [%0.2f, %0.2f]' % (
             test.currentllr, test.lowerllr, test.upperllr, test.elolower, test.eloupper))
 
-    lines.append('Games | N: %d W: %d L: %d D: %d' % (test.games, test.wins, test.losses, test.draws))
+    lines.append('Games | %d: +%d -%d =%d' % (test.games, test.wins, test.losses, test.draws))
 
     if test.use_penta:
         lines.append('Penta | [%d, %d, %d, %d, %d]' % (test.LL, test.LD, test.DD, test.DW, test.WW))
