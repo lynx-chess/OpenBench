@@ -762,6 +762,9 @@ def set_cutechess_permissions():
 
 def cleanup_client():
 
+    # Touch appsettings.json file to prevent it from being deleted
+    Path(os.path.join('Engines', 'appsettings.json')).touch()
+
     SECONDS_PER_DAY   = 60 * 60 * 24
     SECONDS_PER_WEEK  = SECONDS_PER_DAY * 7
     SECONDS_PER_MONTH = SECONDS_PER_WEEK * 4
