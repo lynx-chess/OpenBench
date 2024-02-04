@@ -764,8 +764,10 @@ def set_cutechess_permissions():
 
 def cleanup_client():
 
-    # Touch appsettings.json file to prevent it from being deleted
-    Path(os.path.join('Engines', 'appsettings.json')).touch()
+    # Touch appsettings.json file if it exists to prevent it from being deleted
+    lynx_config_file = os.path.join('Engines', 'appsettings.json')
+    if os.path.exists(lynx_config_file):
+        Path(lynx_config_file).touch()
 
     SECONDS_PER_DAY   = 60 * 60 * 24
     SECONDS_PER_WEEK  = SECONDS_PER_DAY * 7
