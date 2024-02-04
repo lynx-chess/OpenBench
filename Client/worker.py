@@ -773,8 +773,10 @@ def cleanup_client():
             os.remove(os.path.join('PGNs', file))
 
     for file in os.listdir('Engines'):
-        if file_age(os.path.join('Engines', file)) > SECONDS_PER_WEEK:
-            os.remove(os.path.join('Engines', file))
+        file_path = os.path.join('Engines', file)
+        # Double check that the files intended to delete are actually files and not dirs
+        if os.path.isfile(file_path) and file_age(file_path) > SECONDS_PER_WEEK:
+            os.remove(file_path)
 
     for file in os.listdir('Networks'):
         if file_age(os.path.join('Networks', file)) > SECONDS_PER_MONTH:
