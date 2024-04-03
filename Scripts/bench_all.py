@@ -29,10 +29,10 @@ import sys
 
 # Needed to include from ../Client/*.py
 PARENT = os.path.join(os.path.dirname(__file__), os.path.pardir)
-sys.path.append(os.path.abspath(PARENT))
+sys.path.append(os.path.abspath(os.path.join(PARENT, 'Client')))
 
-from Client.utils import *
-from bench_engine import run_benchmark
+from utils import *
+from bench import run_benchmark
 
 def get_default_network(args, network):
 
@@ -48,7 +48,7 @@ def get_public_engine(engine, config):
 
     make_path = config['build']['path']
     branch    = config['test_presets']['default']['base_branch']
-    out_path  = os.path.join('Engines', engine)
+    out_path  = os.path.join('Engines', '%s-%s' % (engine, branch))
     target    = url_join(config['source'], 'archive', '%s.zip' % (branch))
 
     net_sha   = config.get('network', {}).get('sha')
@@ -59,14 +59,14 @@ def get_public_engine(engine, config):
 
     except OpenBenchBuildFailedException as error:
         print ('Failed to build %s...\n\nCompiler Output:' % (engine))
-        for line in error.message.split('\n'):
+        for line in error.logs.split('\n'):
             print ('> %s' % (line))
         print ()
 
 def get_private_engine(engine, config):
 
-    out_path = os.path.join('Engines', engine)
     branch   = config['test_presets']['default']['base_branch']
+    out_path = os.path.join('Engines', '%s-%s' % (engine, branch))
 
     # Format an API request to get the most recent openbench.yml workflow on the primary branch
     api_repo = config['source'].replace('github.com', 'api.github.com/repos')
@@ -84,9 +84,9 @@ def get_private_engine(engine, config):
     cpu_flags = [x.replace('_', '').replace('.', '').upper() for x in cpu_info.get('flags', [])]
 
     try:
-        download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flags, None)
+        download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flags)
 
-    except OpenBenchMissingArtifactExceptionException as error:
+    except OpenBenchMissingArtifactException as error:
         print ('Failed to download %s... %s', engine, error.message)
 
 if __name__ == '__main__':
@@ -141,10 +141,18 @@ if __name__ == '__main__':
         if not configs[engine]['private']:
             get_public_engine(engine, configs[engine])
 
+    # Pretty Formatting
+    max_length   = max(len(engine) for engine in engines)
+    print_format = '%-' + str(max_length) + 's %8d nps %10d nodes in %6.3f seconds'
+
     for engine in engines:
 
+        # Files are saved in Engines/<Engine>-<Branch>
+        branch = configs[engine]['test_presets']['default']['base_branch']
+        binary = os.path.join('Engines', '%s-%s' % (engine, branch))
+
         # Builds may have failed in previous steps, which we can ignore
-        if not (bin_path := check_for_engine_binary(os.path.join('Engines', engine))):
+        if not (bin_path := check_for_engine_binary(binary)):
             print ('Unable to find binary for %s...' % (engine))
             continue
 
@@ -152,5 +160,5 @@ if __name__ == '__main__':
         private_net = configs[engine]['private'] and configs[engine].get('network')
         net_path    = os.path.join('Networks', configs[engine]['network']['sha']) if private_net else None
 
-        nps, nodes = run_benchmark(bin_path, net_path, args.threads, args.sets)
-        print ('%s %d nps %d nodes in %.3f seconds' % (engine, nps, nodes, nodes / max(1e-6, nps)))
+        nps, nodes = run_benchmark(bin_path, net_path, private_net, args.threads, args.sets)
+        print (print_format % (engine, nps, nodes, nodes / max(1e-6, nps)))

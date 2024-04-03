@@ -27,12 +27,13 @@ import django.contrib.auth
 import OpenBench.config
 import OpenBench.utils
 
-from OpenBench.workloads.get_workload import get_workload
 from OpenBench.workloads.create_workload import create_workload
-from OpenBench.workloads.verify_workload import verify_workload
+from OpenBench.workloads.get_workload import get_workload
 from OpenBench.workloads.modify_workload import modify_workload
+from OpenBench.workloads.verify_workload import verify_workload
+from OpenBench.workloads.view_workload import view_workload
 
-from OpenBench.config import OPENBENCH_CONFIG
+from OpenBench.config import OPENBENCH_CONFIG, OPENBENCH_STATIC_VERSION
 from OpenSite.settings import PROJECT_PATH
 
 from OpenBench.models import *
@@ -67,6 +68,7 @@ def render(request, template, content={}, always_allow=False, error=None, warnin
 
     data = content.copy()
     data.update({ 'config' : OPENBENCH_CONFIG })
+    data.update({ 'static_version' : OPENBENCH_STATIC_VERSION })
 
     if OPENBENCH_CONFIG['require_login_to_view']:
         if not request.user.is_authenticated and not always_allow:
@@ -226,6 +228,14 @@ def profile_config(request):
     for engine in json.loads(request.POST.get('deleted-repos', '[]')):
         profile.repos.pop(engine, False)
         changes += 'Deleted Engine: %s\n' % (engine)
+
+    for (engine, current_repo) in profile.repos.items():
+        repo_name = request.POST.get('engine-repo-%s' % (engine), '').removesuffix('/')
+        repo = 'https://github.com/%s' % (repo_name)
+
+        if repo != current_repo and repo_name:
+            changes += 'Updated Engine: %s to use %s\n' % (engine, repo)
+            profile.repos[engine] = repo
 
     if changes:
         profile.save()
@@ -463,12 +473,14 @@ def test(request, id, action=None):
         return redirect(request, '/index/', error='No such Test exists')
 
     # Verify that it is indeed a Test and not a Tune
-    if test.test_mode != 'SPRT' and test.test_mode != 'GAMES':
-        return redirect(request, '/index/', error='You are trying to view a Tune not Test')
+    if test.test_mode == 'TUNE':
+        return redirect(request, '/tune/%d' % (id))
 
-    # Package everything up and display the test
-    data = { 'test' : test, 'results': Result.objects.filter(test=test) }
-    return render(request, 'test.html', data)
+    # Verify that it is indeed a Test and not Datagen
+    if test.test_mode == 'DATAGEN':
+        return redirect(request, '/datagen/%d' % (id))
+
+    return view_workload(request, test, 'TEST')
 
 def tune(request, id, action=None):
 
@@ -482,17 +494,42 @@ def tune(request, id, action=None):
 
     # Verify that it is indeed a Tune and not a Test
     if tune.test_mode == 'SPRT' or tune.test_mode == 'GAMES':
-        return redirect(request, '/index/', error='You are trying to view a Test not Tune')
+        return redirect(request, '/test/%d' % (id))
 
-    # Package everything up and display the Tune
-    data = { 'test' : tune, 'results': Result.objects.filter(test=tune) }
-    return render(request, 'tune.html', data)
+    # Verify that it is indeed a Tune and not Datagen
+    if tune.test_mode == 'DATAGEN':
+        return redirect(request, '/datagen/%d' % (id))
+
+    return view_workload(request, tune, 'TUNE')
+
+def datagen(request, id, action=None):
+
+    # Request is to modify or interact with the Datagen
+    if action != None:
+        return modify_workload(request, id, action)
+
+    # Verify that the Datagen id exists
+    if not (datagen := Test.objects.filter(id=id).first()):
+        return redirect(request, '/index/', error='No such Datagen exists')
+
+    # Verify that it is indeed a Datagen and not a Tune
+    if datagen.test_mode == 'TUNE':
+        return redirect(request, '/tune/%d' % (id))
+
+    # Verify that it is indeed a Datagen and not a Test
+    if datagen.test_mode == 'SPRT' or datagen.test_mode == 'GAMES':
+        return redirect(request, '/test/%d' % (id))
+
+    return view_workload(request, datagen, 'DATAGEN')
 
 def create_test(request):
     return create_workload(request, 'TEST')
 
 def create_tune(request):
     return create_workload(request, 'TUNE')
+
+def create_datagen(request):
+    return create_workload(request, 'DATAGEN')
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                          NETWORK MANAGEMENT VIEWS                           #
@@ -684,22 +721,16 @@ def client_get_workload(request, machine):
 
 @csrf_exempt
 @verify_worker
-def client_wrong_bench(request, machine):
+def client_bench_error(request, machine):
 
     # Find and stop the test with the bad bench
-    if int(request.POST['wrong']) != 0:
-        test = Test.objects.get(id=int(request.POST['test_id']))
-        test.finished = True; test.save()
-
-    # Collect information on the Error
-    wrong   = int(request.POST['wrong'])
-    correct = int(request.POST['correct'])
-    name    = request.POST['engine']
+    test = Test.objects.get(id=int(request.POST['test_id']))
+    test.finished = True; test.save()
 
     # Log the error into the Events table
     LogEvent.objects.create(
         author     = machine.user.username,
-        summary    = 'Got %d Expected %d for %s' % (wrong, correct, name),
+        summary    = request.POST['error'],
         log_file   = '',
         machine_id = int(request.POST['machine_id']),
         test_id    = int(request.POST['test_id']))
