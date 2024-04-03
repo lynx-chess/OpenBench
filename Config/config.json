@@ -1,11 +1,12 @@
 {
-    "client_version"  : 23,
+    "client_version"  : 27,
     "client_repo_url" : "https://github.com/lynx-chess/OpenBench",
     "client_repo_ref" : "lynx",
 
     "use_cross_approval"          : false,
     "require_login_to_view"       : false,
     "require_manual_registration" : false,
+    "balance_engine_throughputs"  : false,
 
     "books" : [
         "2moves_v1.epd",
@@ -16,7 +17,9 @@
         "Endgames.epd",
         "Pohl.epd",
         "Pohl.pgn",
-        "UHO_4060_v2.epd"
+        "UHO_4060_v2.epd",
+        "UHO_4060_vB.epd",
+        "UHO_4060_vT.epd"
     ],
 
     "engines" : [

@@ -21,26 +21,18 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 import argparse
-import os
-import sys
-
-# Needed to include from ../Client/*.py
-PARENT = os.path.join(os.path.dirname(__file__), os.path.pardir)
-sys.path.append(os.path.abspath(os.path.join(PARENT, 'Client')))
-
-from bench import run_benchmark
+import bz2
+import tarfile
 
 if __name__ == '__main__':
 
-    p = argparse.ArgumentParser()
-    p.add_argument('-E', '--engine'  , help='Binary Name',                  required=True)
-    p.add_argument('-N', '--network' , help='Networks for Private Engines', required=False)
-    p.add_argument('-T', '--threads' , help='Concurrent Benchmarks',        required=True, type=int)
-    p.add_argument('-S', '--sets'    , help='Benchmark Sample Count',       required=True, type=int)
-    args = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('archive', help='Path to the OpenBench pgn archive')
+    args = parser.parse_args()
 
-    private = args.network != None
-    speed, bench = run_benchmark(args.engine, args.network, private, args.threads, args.sets)
-
-    print('Bench for %s is %d' % (args.engine, bench))
-    print('Speed for %s is %d' % (args.engine, speed))
+    data = {}
+    with tarfile.open(args.archive, 'r') as tar:
+        for member in filter(lambda x: x.isfile(), tar.getmembers()):
+            if file := tar.extractfile(member):
+                for line in bz2.decompress(file.read()).decode('utf-8').split('\n'):
+                    print (line)

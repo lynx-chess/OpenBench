@@ -58,6 +58,11 @@ urlpatterns = [
     django.urls.path(r'tune/<int:id>/<str:action>', OpenBench.views.tune),
     django.urls.path(r'newTune/', OpenBench.views.create_tune),
 
+    # Links for viewing and managing datagen
+    django.urls.path(r'datagen/<int:id>/', OpenBench.views.datagen),
+    django.urls.path(r'datagen/<int:id>/<str:action>', OpenBench.views.datagen),
+    django.urls.path(r'newDatagen/', OpenBench.views.create_datagen),
+
     # Links for viewing and managing Networks
     django.urls.path(r'networks/', OpenBench.views.networks),
     django.urls.path(r'networks/<str:engine>/', OpenBench.views.networks),
@@ -74,7 +79,7 @@ urlpatterns = [
     django.urls.path(r'clientWorkerInfo/', OpenBench.views.client_worker_info),
     django.urls.path(r'clientGetWorkload/', OpenBench.views.client_get_workload),
     django.urls.path(r'clientGetNetwork/<str:engine>/<str:name>/', OpenBench.views.client_get_network),
-    django.urls.path(r'clientWrongBench/', OpenBench.views.client_wrong_bench),
+    django.urls.path(r'clientBenchError/', OpenBench.views.client_bench_error),
     django.urls.path(r'clientSubmitNPS/', OpenBench.views.client_submit_nps),
     django.urls.path(r'clientSubmitError/', OpenBench.views.client_submit_error),
     django.urls.path(r'clientSubmitResults/', OpenBench.views.client_submit_results),

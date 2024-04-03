@@ -20,7 +20,6 @@
 
 import argparse
 import cpuinfo
-import hashlib
 import json
 import multiprocessing
 import os
@@ -29,7 +28,6 @@ import psutil
 import queue
 import re
 import requests
-import shutil
 import subprocess
 import sys
 import threading
@@ -42,17 +40,22 @@ from subprocess import PIPE, Popen, call, STDOUT
 from itertools import combinations_with_replacement
 from concurrent.futures import ThreadPoolExecutor
 
+## Local imports
+
+import bench
+
 from client import BadVersionException
 from client import url_join
 from client import try_forever
 
+from utils import *
 from pgn_util import compress_list_of_pgns
-
+from genfens import create_genfens_opening_book
 from pathlib import Path
 
 ## Basic configuration of the Client. These timeouts can be changed at will
 
-CLIENT_VERSION   = 23 # Client version to send to the Server
+CLIENT_VERSION   = 27 # Client version to send to the Server
 TIMEOUT_HTTP     = 30 # Timeout in seconds for HTTP requests
 TIMEOUT_ERROR    = 10 # Timeout in seconds when any errors are thrown
 TIMEOUT_WORKLOAD = 30 # Timeout in seconds between workload requests
@@ -102,6 +105,7 @@ class Configuration:
         self.identity    = args.identity if args.identity else 'None'
         self.syzygy_path = args.syzygy   if args.syzygy   else None
         self.fleet       = args.fleet    if args.fleet    else False
+        self.focus       = args.focus    if args.focus    else []
 
     def init_client(self):
 
@@ -212,51 +216,6 @@ class Configuration:
             with open('machine.txt') as fin:
                 self.machine_id = fin.readlines()[0]
 
-    def choose_best_artifact(self, options):
-
-        # Step 1. Filter down to our operating system only
-        options = [x for x in options if x.split('-')[1] == self.os_name.lower()]
-
-        # Pick betwen various Vector instruction sets that might apply
-        has_ssse3  =                all(x in self.cpu_flags for x in ['SSSE3'])
-        has_sse4   = has_ssse3  and all(x in self.cpu_flags for x in ['SSE41', 'SSE42'])
-        has_avx    = has_sse4   and all(x in self.cpu_flags for x in ['AVX'])
-        has_avx2   = has_avx    and all(x in self.cpu_flags for x in ['AVX2', 'FMA'])
-        has_avx512 = has_avx2   and all(x in self.cpu_flags for x in ['AVX512BW', 'AVX512DQ', 'AVX512F'])
-        has_vnni   = has_avx512 and all(x in self.cpu_flags for x in ['AVX512VNNI'])
-
-        # Filtering system, where we remove everything but the strongest that is available
-        selection = [
-            (has_vnni  , 'vnni'  ), (has_avx512, 'avx512'), (has_avx2  , 'avx2'  ),
-            (has_avx   , 'avx'   ), (has_sse4  , 'sse4'  ), (has_ssse3 , 'ssse3' ),
-        ]
-
-        # Step 2. Filter everything but the best Vector instruction set that was available
-        for boolean, identifier in selection:
-            if boolean and identifier in [x.split('-')[2] for x in options]:
-                options = [x for x in options if x.split('-')[2] == identifier]
-                break
-
-        # Identify any Ryzen or AMD chip, excluding the 7B12
-        ryzen = 'AMD' in self.cpu_name.upper()
-        ryzen = 'RYZEN' in self.cpu_name.upper() or ryzen
-        ryzen = ryzen and '7B12' not in self.cpu_name.upper()
-
-        # Pick between POPCNT and BMI2/PEXT
-        has_popcnt = 'POPCNT' in self.cpu_flags
-        has_bmi2   = 'BMI2' in self.cpu_flags and not ryzen
-
-        # Filtering system, where we remove everything but the strongest that is available
-        selection = [ (has_bmi2, 'pext'), (has_popcnt, 'popcnt') ]
-
-        # Step 3. Filter everything but the best bitop instruction set that was available
-        for boolean, identifier in selection:
-            if boolean and identifier in [x.split('-')[3] for x in options]:
-                options = [x for x in options if x.split('-')[3] == identifier]
-                break
-
-        return options[0]
-
 class ServerReporter:
 
     ## Handles reporting things to the server, which are not intended to send a great
@@ -320,7 +279,7 @@ class ServerReporter:
         return ServerReporter.report(config, 'clientSubmitError', payload)
 
     @staticmethod
-    def report_engine_error(config, error, pgn):
+    def report_engine_error(config, error, pgn=None):
 
         payload = {
             'test_id'    : config.workload['test']['id'],
@@ -331,16 +290,14 @@ class ServerReporter:
         return ServerReporter.report(config, 'clientSubmitError', payload)
 
     @staticmethod
-    def report_bad_bench(config, branch, bench):
+    def report_bad_bench(config, error):
 
         payload = {
             'test_id'    : config.workload['test']['id'],
-            'engine'     : config.workload['test'][branch]['name'],
-            'correct'    : config.workload['test'][branch]['bench'],
-            'wrong'      : bench,
+            'error'      : error,
         }
 
-        return ServerReporter.report(config, 'clientWrongBench', payload)
+        return ServerReporter.report(config, 'clientBenchError', payload)
 
     @staticmethod
     def report_results(config, batches):
@@ -424,8 +381,12 @@ class Cutechess:
         is_frc    = 'FRC' in book_name or '960' in book_name or 'FISCHER' in book_name
         variant   = ['standard', 'fischerandom'][is_frc]
 
-        # Always include -repeat and -recover
-        return '-repeat -recover -variant %s' % (variant)
+        # Only include -repeat if not skipping the reverses in DATAGEN
+        is_datagen = config.workload['test']['type'] == 'DATAGEN'
+        no_reverse = is_datagen and not config.workload['test']['play_reverses']
+
+        # Always include -recover and -variant
+        return ['-repeat', ''][no_reverse] + ' -recover -variant %s' % (variant)
 
     @staticmethod
     def concurrency_settings(config):
@@ -461,6 +422,15 @@ class Cutechess:
 
     @staticmethod
     def book_settings(config, cutechess_idx):
+
+        # DATAGEN creates their own book
+        if config.workload['test']['type'] == 'DATAGEN':
+
+            # -repeat might not be applied, so handle the book offsets
+            no_reverse = not config.workload['test']['play_reverses']
+            pairs      = config.workload['distribution']['games-per-cutechess'] // 2
+            start      = 1 + (cutechess_idx * pairs * (1 + no_reverse))
+            return '-openings file=Books/openbench.genfens.epd format=epd order=sequential start=%d' % (start)
 
         # Can handle EPD and PGN Books, which must be specified
         book_name   = config.workload['test']['book']['name']
@@ -567,14 +537,13 @@ class Cutechess:
     def kill_everything(dev_process, base_process):
 
         if IS_LINUX:
-            subprocess.run(['pkill', 'cutechess-ob'])
-            subprocess.run(['pkill', dev_process])
-            subprocess.run(['pkill', base_process])
+            kill_process_by_name('cutechess-ob')
 
         if IS_WINDOWS:
-            subprocess.run(['taskkill', '/f', '/im', 'cutechess-ob.exe'])
-            subprocess.run(['taskkill', '/f', '/im', dev_process])
-            subprocess.run(['taskkill', '/f', '/im', base_process])
+            kill_process_by_name('cutechess-ob.exe')
+
+        kill_process_by_name(dev_process)
+        kill_process_by_name(base_process)
 
     @staticmethod
     def pgn_name(config, timestamp, cutechess_idx):
@@ -824,77 +793,6 @@ def validate_syzygy_exists(config, K):
     return True
 
 
-def download_file(source, outname, post_data=None, headers=None):
-
-    arguments = { 'stream' : True, 'timeout' : TIMEOUT_ERROR, 'headers' : headers }
-    function  = [requests.get, requests.post][post_data != None]
-    if post_data: arguments['data'] = post_data
-
-    request = function(source, **arguments)
-    with open(outname, 'wb') as fout:
-        for chunk in request.iter_content(chunk_size=1024):
-            if chunk: fout.write(chunk)
-        fout.flush()
-
-def unzip_delete_file(source, outdir):
-    with zipfile.ZipFile(source) as fin:
-        fin.extractall(outdir)
-    os.remove(source)
-
-
-def make_command(config, engine, output_name, src_path, network_path):
-
-    compiler  = config.compilers[engine][0]
-    comp_flag = ['CC', 'CXX']['++' in compiler]
-    command   = 'make %s=%s EXE=%s -j%d' % (comp_flag, compiler, output_name, config.threads)
-
-    if network_path != None:
-        path     = os.path.relpath(os.path.abspath(network_path), src_path)
-        command += ' EVALFILE=%s' % (path.replace('\\', '/'))
-
-    return command.split()
-
-def parse_bench_output(stream):
-
-    nps = bench = None # Search through output Stream
-    for line in stream.decode('ascii').strip().split('\n')[::-1]:
-
-        # Convert non alpha-numerics to spaces
-        line = re.sub(r'[^a-zA-Z0-9 ]+', ' ', line)
-
-        # Multiple methods, including Ethereal and Stockfish
-        nps_pattern   = r'(\d+\s+nps)|(nps\s+\d+)|(nodes second\s+\d+)'
-        bench_pattern = r'(\d+\s+nodes)|(nodes\s+\d+)|(nodes searched\s+\d+)'
-
-        # Search for and set only once the NPS value
-        re_nps = re.search(nps_pattern, line, re.IGNORECASE)
-        if re_nps:
-            nps = nps if nps else re_nps.group()
-
-        # Search for and set only once the Bench value
-        re_bench = re.search(bench_pattern, line, re.IGNORECASE)
-        if re_bench:
-            bench = bench if bench else re_bench.group()
-
-    # Parse out the integer portion from our matches
-    nps   = int(re.search(r'\d+', nps  ).group()) if nps   else None
-    bench = int(re.search(r'\d+', bench).group()) if bench else None
-
-    return (bench, nps)
-
-def run_bench(engine, outqueue, private_net=None):
-
-    try:
-        #print('./' + engine)
-        # We may need to set an EvalFile via the UCI Options
-        if not private_net: cmd = ['./' + engine, 'bench', 'quit']
-        else: cmd = ['./' + engine, 'setoption name EvalFile value %s' % (private_net), 'bench', 'quit']
-
-        # Launch the engine and parse output for statistics
-        stdout, stderr = Popen(cmd, stdout=PIPE, stderr=STDOUT).communicate()
-        outqueue.put(parse_bench_output(stdout))
-    except Exception: outqueue.put((0, 0))
-
 def scale_time_control(workload, scale_factor, branch):
 
     # Extract everything from the workload dictionary
@@ -902,7 +800,7 @@ def scale_time_control(workload, scale_factor, branch):
     time_control  = workload['test'][branch]['time_control']
 
     # Searching for Nodes or Depth time controls ("N=", "D=")
-    pattern = '(?P<mode>((N))|(D))=(?P<value>(\d+))'
+    pattern = r'(?P<mode>((N))|(D))=(?P<value>(\d+))'
     results = re.search(pattern, time_control.upper())
 
     # No scaling is needed for fixed nodes or fixed depth games
@@ -911,7 +809,7 @@ def scale_time_control(workload, scale_factor, branch):
         return 'tc=inf %s=%s' % ({'N' : 'nodes', 'D' : 'depth'}[mode], value)
 
     # Searching for MoveTime or Fixed Time Controls ("MT=")
-    pattern = '(?P<mode>(MT))=(?P<value>(\d+))'
+    pattern = r'(?P<mode>(MT))=(?P<value>(\d+))'
     results = re.search(pattern, time_control.upper())
 
     # Scale the time based on this machine's NPS. Add a time Margin to avoid time losses.
@@ -920,7 +818,7 @@ def scale_time_control(workload, scale_factor, branch):
         return 'st=%.2f timemargin=250' % ((float(value) * scale_factor / 1000))
 
     # Searching for "X/Y+Z" time controls
-    pattern = '(?P<moves>(\d+/)?)(?P<base>\d*(\.\d+)?)(?P<inc>\+(\d+\.)?\d+)?'
+    pattern = r'(?P<moves>(\d+/)?)(?P<base>\d*(\.\d+)?)(?P<inc>\+(\d+\.)?\d+)?'
     results = re.search(pattern, time_control)
     moves, base, inc = results.group('moves', 'base', 'inc')
 
@@ -986,6 +884,7 @@ def server_configure_worker(config):
         'concurrency'    : config.threads,        # Threads to use to play games
         'sockets'        : config.sockets,        # Cutechess copies, usually equal to Socket count
         'syzygy_max'     : config.syzygy_max,     # Whether or not the machine has Syzygy support
+        'focus'          : config.focus,          # List of engines we have a preference to help
         'client_ver'     : CLIENT_VERSION,        # Version of the Client, which the server may reject
     }
 
@@ -1026,52 +925,55 @@ def server_request_workload(config):
 
     payload  = { 'machine_id' : config.machine_id, 'secret' : config.secret_token }
     target   = url_join(config.server, 'clientGetWorkload')
-    response_object = requests.post(target, data=payload, timeout=TIMEOUT_HTTP)
+    response = requests.post(target, data=payload, timeout=TIMEOUT_HTTP)
 
-    if response_object.ok:
-        response = response_object.json()
+    # Server errors produce garbage back, which we should not alarm a user with
+    try: response = response.json()
+    except json.decoder.JSONDecodeError:
+        raise OpenBenchBadServerResponseException() from None
 
-        # Throw all the way back to the client.py
-        if 'Bad Client Version' in response.get('error', ''):
-            raise BadVersionException();
+    # Throw all the way back to the client.py
+    if 'Bad Client Version' in response.get('error', ''):
+        raise BadVersionException();
 
-        # The 'error' header is included if there was an issue
-        if 'error' in response:
-            raise Exception('[Error] %s' % (response['error']))
+    # The 'error' header is included if there was an issue
+    if 'error' in response:
+        raise Exception('[Error] %s' % (response['error']))
 
-        # Log the start of a new Workload
-        if 'workload' in response:
-            dev_engine  = response['workload']['test']['dev' ]['engine']
-            dev_name    = response['workload']['test']['dev' ]['name'  ]
-            base_engine = response['workload']['test']['base']['engine']
-            base_name   = response['workload']['test']['base']['name'  ]
-            print('Workload [%s] %s vs [%s] %s\n' % (dev_engine, dev_name, base_engine, base_name))
+    # Log the start of a new Workload
+    if 'workload' in response:
+        dev_engine  = response['workload']['test']['dev' ]['engine']
+        dev_name    = response['workload']['test']['dev' ]['name'  ]
+        base_engine = response['workload']['test']['base']['engine']
+        base_name   = response['workload']['test']['base']['name'  ]
+        print('Workload [%s] %s vs [%s] %s\n' % (dev_engine, dev_name, base_engine, base_name))
 
-        config.workload = response.get('workload', None)
-    else:
-        config.workload = None
-
+    config.workload = response.get('workload', None)
 
 def complete_workload(config):
 
     # Download the opening book, throws an exception on corruption
-    download_opening_book(config)
+    download_opening_book(
+        config.workload['test']['book']['sha'   ],
+        config.workload['test']['book']['source'],
+        config.workload['test']['book']['name'  ],
+    )
 
     # Download each NNUE file, throws an exception on corruption
-    dev_network  = download_network_weights(config, 'dev' )
-    base_network = download_network_weights(config, 'base')
+    dev_network  = safe_download_network_weights(config, 'dev' )
+    base_network = safe_download_network_weights(config, 'base')
 
     # Build or download each engine, or exit if an error occured
-    dev_name  = download_engine(config, 'dev' , dev_network )
-    base_name = download_engine(config, 'base', base_network)
-    if not dev_name or not base_name: return
+    dev_name  = safe_download_engine(config, 'dev' , dev_network )
+    base_name = safe_download_engine(config, 'base', base_network)
+
+    # Datagen creates a book on-the-fly
+    if config.workload['test']['type'] == 'DATAGEN':
+        safe_create_genfens_opening_book(config, dev_name, dev_network)
 
     # Run the benchmarks and compute the scaling NPS value
-    dev_nps  = run_benchmarks(config, 'dev' , dev_name , dev_network )
-    base_nps = run_benchmarks(config, 'base', base_name, base_network)
-
-    # Report NPS to server, or exit if an error occured
-    if not dev_nps or not base_nps: return
+    dev_nps  = safe_run_benchmarks(config, 'dev' , dev_name , dev_network )
+    base_nps = safe_run_benchmarks(config, 'base', base_name, base_network)
     ServerReporter.report_nps(config, dev_nps, base_nps)
 
     # Scale the engines together, using their NPS relative to expected
@@ -1084,12 +986,6 @@ def complete_workload(config):
     print ('Scale Factor Base : %.4f' % (base_factor))
     print ('Scale Factor Avg  : %.4f' % (avg_factor ))
 
-    # Scale using the base factor only, in the event of a cross-engine test
-    dev_engine    = config.workload['test']['dev' ]['engine']
-    base_engine   = config.workload['test']['base']['engine']
-    scale_factor  = base_factor if dev_engine != base_engine else avg_factor
-    #scale_factor  = 1
-
     # Server knows how many copies of Cutechess we should run
     cutechess_cnt   = config.workload['distribution']['cutechess-count']
     concurrency_per = config.workload['distribution']['concurrency-per']
@@ -1098,7 +994,12 @@ def complete_workload(config):
     print () # Record this information
     print ('%d cutechess copies' % (cutechess_cnt))
     print ('%d concurrent games per copy' % (concurrency_per))
-    print ('%d total games per cutechess copy' % (games_per))
+    print ('%d total games per cutechess copy\n' % (games_per))
+
+    # Scale using the base factor only, in the event of a cross-engine test
+    dev_engine    = config.workload['test']['dev' ]['engine']
+    base_engine   = config.workload['test']['base']['engine']
+    scale_factor  = base_factor if dev_engine != base_engine else avg_factor
 
     # Launch and manage all of the Cutechess workers
     with ThreadPoolExecutor(max_workers=cutechess_cnt) as executor:
@@ -1132,65 +1033,28 @@ def complete_workload(config):
             pgn_files  = [Cutechess.pgn_name(config, timestamp, x) for x in range(cutechess_cnt)]
             ServerReporter.report_pgn(config, compress_list_of_pgns(pgn_files, scale_factor, compact))
 
-def download_opening_book(config):
+def safe_download_network_weights(config, branch):
 
-    # Log our attempts to download and verify the book
-    book_sha256 = config.workload['test']['book']['sha'   ]
-    book_source = config.workload['test']['book']['source']
-    book_name   = config.workload['test']['book']['name'  ]
-    book_path   = os.path.join('Books', book_name)
-    print('Fetching Opening Book [%s]' % (book_name))
+    # Wraps utils.py:download_network()
+    # May raise OpenBenchCorruptedNetworkException
 
-    # Download file if we do not already have it
-    if not os.path.isfile(book_path):
-        download_file(book_source, book_name + '.zip')
-        unzip_delete_file(book_name + '.zip', 'Books/')
+    engine   = config.workload['test'][branch]['engine' ]
+    net_name = config.workload['test'][branch]['netname']
+    net_sha  = config.workload['test'][branch]['network']
+    net_path = os.path.join('Networks', net_sha)
 
-    # Verify SHAs match with the server
-    with open(book_path) as fin:
-        content = fin.read().encode('utf-8')
-        sha256  = hashlib.sha256(content).hexdigest()
-    if book_sha256 != sha256: os.remove(book_path)
+    # Not all engines use Network files
+    if not net_sha or net_sha == 'None':
+        return None
 
-    # Log SHAs on every workload
-    print('Correct  SHA256 %s' % (book_sha256.upper()))
-    print('Download SHA256 %s\n' % (   sha256.upper()))
+    credentials = (config.server, config.username, config.password)
+    download_network(*credentials, engine, net_name, net_sha, net_path)
 
-    # We have to have the correct SHA to continue
-    if book_sha256 != sha256:
-        raise Exception('Invalid SHA for %s' % (book_name))
+    return net_path
 
-def download_network_weights(config, branch):
+def safe_download_engine(config, branch, net_path):
 
-    # Some tests may not use Neural Networks
-    engine_name  = config.workload['test'][branch]['engine']
-    network_sha  = config.workload['test'][branch]['network']
-    network_name = config.workload['test'][branch]['netname']
-    if not network_sha or network_sha == 'None': return None
-
-    # Log that we are obtaining a Neural Network
-    print ('Fetching Neural Network [ %s, %-4s ]' % (branch, network_name))
-
-    # Fetch the Netural Network if we do not already have it
-    network_path = os.path.join('Networks', network_sha)
-    if not os.path.isfile(network_path):
-        target  = url_join(config.server, 'clientGetNetwork')
-        payload = { 'username' : config.username, 'password' : config.password }
-        download_file(url_join(target, engine_name, network_sha), network_path, payload)
-
-    # Verify the download and delete partial or corrupted ones
-    with open(network_path, 'rb') as network:
-        sha256 = hashlib.sha256(network.read()).hexdigest()
-        sha256 = sha256[:8].upper()
-    if network_sha != sha256: os.remove(network_path)
-
-    # We have to have the correct Neural Network to continue
-    if network_sha != sha256:
-        raise Exception('Invalid SHA for %s' % (network_sha))
-
-    return network_path
-
-def download_engine(config, branch, network):
+    # Wraps utils.py:download_public_engine() and utils.py:download_private_engine()
 
     engine      = config.workload['test'][branch]['engine']
     branch_name = config.workload['test'][branch]['name']
@@ -1198,129 +1062,66 @@ def download_engine(config, branch, network):
     source      = config.workload['test'][branch]['source']
     private     = config.workload['test'][branch]['private']
 
-    # Naming as Engine-CommitSha[:8]-NetworkSha[:8]
-    final_name = '%s-%s' % (engine, commit_sha.upper()[:8])
-    if network and not private: final_name += '-%s' % (network[-8:])
-
-    # Check to see if we already have the final binary
-    final_path = os.path.join('Engines', final_name)
-    if os.path.isfile(final_path): return final_name
-    if os.path.isfile(final_path + '.exe'): return final_name + '.exe'
+    bin_name = engine_binary_name(engine, commit_sha, net_path, private)
+    out_path = os.path.join('Engines', bin_name)
 
     if private:
 
-        # Get the candidate artifacts that we can pick from
-        print ('\nFetching Artifacts for %s' % branch_name)
-        with open('credentials.%s' % (engine.replace(' ', '').lower())) as fin:
-            auth_headers = { 'Authorization' : 'token %s' % fin.readlines()[0].rstrip() }
+        try:
+            return download_private_engine(
+                engine, branch_name, source, out_path, config.cpu_name, config.cpu_flags)
 
-        # Pick from available artifacts the name of the best one
-        artifacts = requests.get(url=source, headers=auth_headers).json()['artifacts']
-        options   = [artifact['name'] for artifact in artifacts]
-        best      = config.choose_best_artifact(options)
+        except OpenBenchMissingArtifactException as error:
+            ServerReporter.report_missing_artifact(config, branch, error.name, error.logs)
+            raise
 
-        # Search for our artifact in the list provided
-        artifact_id = None
-        for artifact in artifacts:
-            if artifact['name'] == best:
-                artifact_id = artifact['id']
+    else:
 
-        # Artifact was missing, workload cannot be completed
-        if artifact_id == None:
-            ServerReporter.report_missing_artifact(config, branch, best, artifacts)
-            return None
+        make_path = config.workload['test'][branch]['build']['path']
+        compiler  = config.compilers[engine][0]
 
-        # Download the binary that matches our desired artifact
-        print ('Downloading [%s] %s' % (branch_name, best))
-        base = source.split('/runs/')[0]
-        url  = url_join(base, 'artifacts', str(artifact_id), 'zip').rstrip('/')
-        download_file(url, 'artifact.zip', None, auth_headers)
+        try:
+            return download_public_engine(
+                engine, net_path, branch_name, source, make_path, out_path, compiler)
 
-        # Unzip the binary, and place it into a known output name
-        unzip_delete_file('artifact.zip', 'tmp/')
-        binary_path = os.path.join('tmp', engine.replace(' ', '').lower())
-        os.rename(os.path.join('tmp', os.listdir('tmp/')[0]), binary_path)
+        except OpenBenchBuildFailedException as error:
 
-        # Binaries don't have execute permissions by default
-        if IS_LINUX:
-            os.system('chmod 777 %s\n' % (binary_path))
+            print ('Failed to build %s-%s...\n\nCompiler Output:' % (engine, branch_name))
+            for line in error.logs.split('\n'):
+                print ('> %s' % (line))
+            print ()
 
-    if not private:
+            ServerReporter.report_build_fail(config, branch, error.logs)
+            raise
 
-        # Download and unzip the source from Github
-        download_file(source, '%s.zip' % (engine))
-        unzip_delete_file('%s.zip' % (engine), 'tmp/')
+def safe_create_genfens_opening_book(config, dev_name, dev_network):
 
-        # Parse out paths to find the makefile location
-        tokens     = source.split('/')
-        unzip_name = '%s-%s' % (tokens[-3], tokens[-1].rstrip('.zip'))
-        build_path = config.workload['test'][branch]['build']['path']
-        src_path   = os.path.join('tmp', unzip_name, *build_path.split('/'))
+    try: create_genfens_opening_book(config, dev_name, dev_network)
 
-        # Build the engine and drop it into src_path
-        print('\nBuilding [%s]' % (branch_name))
-        binary_path = os.path.join(src_path, final_name)
-        # print('\nExpected output file: [%s]' % (binary_path))
-        command     = make_command(config, engine, final_name, src_path, network)
-        process     = Popen(command, cwd=src_path, stdout=PIPE, stderr=STDOUT)
-        cxx_output  = process.communicate()[0].decode('utf-8')
-        print (cxx_output)
+    except OpenBenchFailedGenfensException as error:
+        ServerReporter.report_engine_error(config, error.message)
+        raise
 
-    # Move the file to the final location ( Linux )
-    if os.path.isfile(binary_path):
-        os.rename(binary_path, final_path)
-        shutil.rmtree('tmp')
-        return final_name
+def safe_run_benchmarks(config, branch, engine, network):
 
-    # Move the file to the final location ( Windows )
-    if os.path.isfile(binary_path + '.exe'):
-        os.rename(binary_path + '.exe', final_path + '.exe')
-        shutil.rmtree('tmp')
-        return final_name + '.exe'
+    name     = config.workload['test'][branch]['name']
+    private  = config.workload['test'][branch]['private']
+    expected = int(config.workload['test'][branch]['bench'])
+    binary   = os.path.join('Engines', engine)
 
-    # Manual builds should have exited by now
-    if not private:
-        ServerReporter.report_build_fail(config, branch, cxx_output)
-        return None
+    try:
+        print('\nRunning %dx Benchmarks for %s' % (config.threads, name))
+        speed, nodes = bench.run_benchmark(
+            binary, network, private, config.threads, 1, expected)
 
+    except OpenBenchBadBenchException as error:
+        ServerReporter.report_bad_bench(config, error.message)
+        raise
 
-def run_benchmarks(config, branch, engine, network):
+    print('Bench for %s is %d' % (name, nodes))
+    print('Speed for %s is %d' % (name, speed))
+    return speed
 
-    queue   = multiprocessing.Queue()
-    name    = config.workload['test'][branch]['name']
-    private = config.workload['test'][branch]['private']
-    print('\nRunning %dx Benchmarks for %s' % (config.threads, name))
-
-    args = [os.path.join('Engines', engine), queue]
-    if private and network:
-        args.append(network)
-
-    # Run the benchmark on all threads we are using
-    workers = [
-        multiprocessing.Process(target=run_bench, args=args)
-        for ii in range(config.threads)
-    ]
-
-    # Start and wait for each worker to finish
-    for worker in workers: worker.start()
-    for worker in workers: worker.join()
-
-    # Collect all bench and nps values, and set bench to 0 if any vary
-    bench, nps = list(zip(*[queue.get() for ii in range(config.threads)]))
-    bench = [0, bench[0]][len(set(bench)) == 1]
-    nps   = sum(nps) // config.threads
-
-    # Output everything, including 0 for an error
-    print('Bench for %s is %d' % (name, bench))
-    print('Speed for %s is %d' % (name, nps))
-
-    # Flag the test to abort if we have a bench mismatch
-    error = (bench != int(config.workload['test'][branch]['bench']))
-    if error:
-        ServerReporter.report_bad_bench(config, branch, bench)
-
-    # Set NPS to 0 if we had any errors
-    return 0 if not bench or error else nps
 
 def build_cutechess_command(config, dev_cmd, base_cmd, scale_factor, timestamp, cutechess_idx):
 
@@ -1392,9 +1193,32 @@ def run_and_parse_cutechess(config, command, cutechess_idx, results_queue, abort
 #                                                                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-def run_openbench_worker(args):
+def parse_arguments(client_args):
 
-    config = Configuration(args) # System info, Cmdline arguments, and Workload
+    # Pretty formatting
+    p = argparse.ArgumentParser(
+        formatter_class=lambda prog:
+            argparse.ArgumentDefaultsHelpFormatter(prog, max_help_position=10)
+    )
+
+    # Arguments specific to worker.py
+    p.add_argument('-T', '--threads' , help='Total Threads'           , required=True      )
+    p.add_argument('-N', '--nsockets', help='Number of Sockets'       , required=True      )
+    p.add_argument('-I', '--identity', help='Machine pseudonym'       , required=False     )
+    p.add_argument(      '--syzygy'  , help='Syzygy WDL'              , required=False     )
+    p.add_argument(      '--fleet'   , help='Fleet Mode'              , action='store_true')
+    p.add_argument(      '--focus'   , help='Prefer certain engine(s)', nargs='+'          )
+
+    # Ignore unknown arguments ( from client )
+    worker_args, unknown = p.parse_known_args()
+
+    # Add the client args (Username, Password, and Server) to the worker args
+    return argparse.Namespace(**{ **vars(client_args), **vars(worker_args) })
+
+def run_openbench_worker(client_args):
+
+    args   = parse_arguments(client_args) # Merge client.py and worker.py args
+    config = Configuration(args)          # Holds System info, args, and Workload info
 
     setup_error      = '[Note] Unable to establish initial connection with the Server!'
     connection_error = '[Note] Unable to reach the server to request a workload!'

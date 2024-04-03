@@ -18,17 +18,26 @@
 #                                                                           #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-import shutil
 import argparse
 import hashlib
 import os
 import platform
 import requests
+import shutil
 import subprocess
 import tempfile
 import zipfile
 
+IS_WINDOWS = platform.system() == 'Windows' # Don't touch this
+IS_LINUX   = platform.system() != 'Windows' # Don't touch this
+
 class OpenBenchBuildFailedException(Exception):
+    def __init__(self, message, logs):
+        self.message = message
+        self.logs    = logs
+        super().__init__(self.message)
+
+class OpenBenchBadBenchException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
@@ -38,15 +47,40 @@ class OpenBenchCorruptedNetworkException(Exception):
         self.message = message
         super().__init__(self.message)
 
+class OpenBenchCorruptedBookException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
 class OpenBenchMissingAPICredentialsException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
 
-class OpenBenchMissingArtifactExceptionException(Exception):
+class OpenBenchMissingArtifactException(Exception):
+    def __init__(self, name, logs):
+        self.name = name
+        self.logs = logs
+        super().__init__(self.name, self.logs)
+
+class OpenBenchBadServerResponseException(Exception):
+    def __init__(self):
+        self.message = ''
+        super().__init__(self.message)
+
+class OpenBenchFailedGenfensException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+def kill_process_by_name(process_name):
+
+    if IS_LINUX:
+        subprocess.run(['pkill', '-f', process_name])
+
+    if IS_WINDOWS:
+        subprocess.run(['taskkill', '/f', '/im', process_name])
 
 
 def url_join(*args, trailing_slash=True):
@@ -101,6 +135,12 @@ def read_git_credentials(engine):
     raise OpenBenchMissingAPICredentialsException('%s not found' % fname)
 
 
+def engine_binary_name(engine, commit_sha, net_path, private):
+    name = '%s-%s' % (engine, commit_sha.upper()[:8])
+    if net_path and not private:
+        name += '-%s' % (net_path[-8:])
+    return name
+
 def check_for_engine_binary(out_path):
 
     # Check for already having the binary ( Linux )
@@ -123,8 +163,7 @@ def makefile_command(net_path, make_path, out_path, compiler):
 
     # Build with EVALFILE= to embed NNUE files
     if net_path:
-        rel_net_path = os.path.relpath(os.path.abspath(net_path), make_path)
-        command += ['EVALFILE=%s' % (rel_net_path.replace('\\', '/'))]
+        command += ['EVALFILE=%s' % (os.path.abspath(net_path).replace('\\', '/'))]
 
     return command
 
@@ -174,6 +213,50 @@ def select_best_artifact(options, cpu_name, cpu_flags):
     return options[artifacts[0]]
 
 
+def download_opening_book(book_sha, book_source, book_name):
+
+    book_path = os.path.join('Books', book_name)
+
+    # Datagen workloads might not include a book
+    if book_name.upper() == 'NONE':
+        return
+
+    # Book might already have been downloaded
+    if not os.path.exists(book_path):
+
+        print ('Fetching Opening Book [%s]' % (book_name))
+
+        # Work with temp files and directories until finished extracting
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            # Download the zip file from Github
+            zip_path = os.path.join(temp_dir, '%s.zip' % (book_name))
+            with open(zip_path, 'wb') as zip_file:
+                zip_file.write(requests.get(book_source).content)
+
+            # Unzip the book to a directory
+            unzip_path = os.path.join(temp_dir, book_name)
+            with zipfile.ZipFile(zip_path, 'r') as zip_file:
+                zip_file.extractall(unzip_path)
+
+            # Rename the sole binary
+            unzip_root = os.path.join(unzip_path, os.listdir(unzip_path)[0])
+            shutil.move(unzip_root, book_path)
+
+    # Verify SHAs match with the server
+    with open(book_path) as fin:
+        content = fin.read().encode('utf-8')
+        sha256  = hashlib.sha256(content).hexdigest()
+
+    # Log SHAs on every workload
+    print ('Correct  %s' % (book_sha.upper()))
+    print ('Download %s\n' % (sha256.upper()))
+
+    # We have to have the correct SHA to continue
+    if book_sha.upper() != sha256.upper():
+        os.remove(book_path)
+        raise OpenBenchCorruptedBookException('Invalid sha for %s' % (book_name))
+
 def download_network(server, username, password, engine, net_name, net_sha, net_path):
 
     # Avoid redownloading Network files
@@ -181,7 +264,7 @@ def download_network(server, username, password, engine, net_name, net_sha, net_
 
         # Format the API request, including credentials
         print ('Fetching %s (%s) for %s' % (net_name, net_sha, engine))
-        endpoint = '/api/networks/%s/%s' % (engine, net_sha)
+        endpoint = 'api/networks/%s/%s' % (engine, net_sha)
         request  = credentialed_request(server, username, password, endpoint)
 
         # Write the content out to the net_path in kb chunks
@@ -190,22 +273,25 @@ def download_network(server, username, password, engine, net_name, net_sha, net_
                 if chunk: fout.write(chunk)
             fout.flush()
 
+    else:
+        print ('Found %s (%s) for %s' % (net_name, net_sha, engine))
+
     # Check for the first 8 characters of the sha256
-    print ('Verifying %s (%s) for %s' % (net_name, net_sha, engine))
+    print ('Verifying %s (%s) for %s\n' % (net_name, net_sha, engine))
     with open(net_path, 'rb') as network:
-        sha256 = hashlib.sha256(network.read()).hexdigest()[:8].upper()
+        sha256 = hashlib.sha256(network.read()).hexdigest()[:8]
 
     # Verify the download and delete partial or corrupted ones
-    if net_sha != sha256:
+    if net_sha.upper() != sha256.upper():
         os.remove(net_path)
-        raise OpenBenchCorruptedNetworkException('Invalid SHA for %s' % (network_sha))
+        raise OpenBenchCorruptedNetworkException('Invalid SHA for %s' % (net_name))
 
 def download_public_engine(engine, net_path, branch, source, make_path, out_path, compiler=None):
 
     # Check to see if we already have the binary
     if check_for_engine_binary(out_path):
         print('Found [%s-%s]' % (engine, branch))
-        return check_for_engine_binary(out_path)
+        return os.path.basename(check_for_engine_binary(out_path))
 
     # Work with temp files and directories until finished building
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -213,7 +299,7 @@ def download_public_engine(engine, net_path, branch, source, make_path, out_path
         print('Building [%s-%s]' % (engine, branch))
 
         # Download the zip file from Github
-        zip_path = os.path.join(temp_dir, '%s-%s' % (engine, branch))
+        zip_path = os.path.join(temp_dir, '%s-tmp' % (engine))
         with open(zip_path, 'wb') as zip_file:
             zip_file.write(requests.get(source).content)
 
@@ -224,31 +310,41 @@ def download_public_engine(engine, net_path, branch, source, make_path, out_path
 
         # Rename the Root folder for ease of conventions
         unzip_root = os.path.join(unzip_path, os.listdir(unzip_path)[0])
-        src_path   = os.path.join(unzip_path, '%s-%s' % (engine, branch))
+        src_path   = os.path.join(unzip_path, '%s-tmp' % (engine))
         os.rename(unzip_root, src_path)
 
         # Prepare the MAKEFILE command
-        make_path    = os.path.join(src_path, make_path)
-        rel_out_path = os.path.relpath(os.path.abspath(out_path), make_path)
-        make_cmd     = makefile_command(net_path, make_path, rel_out_path, compiler)
+        make_path = os.path.join(src_path, make_path)
+        bin_path  = os.path.join(make_path, os.path.basename(out_path))
+        make_cmd  = makefile_command(net_path, make_path, os.path.basename(out_path), compiler)
 
-        # Build the engine, which will produce a binary to the original out_path
+        # Build the engine, which will produce a binary to bin_path, to be moved after
         process     = subprocess.Popen(make_cmd, cwd=make_path, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         comp_output = process.communicate()[0].decode('utf-8')
 
-    # Check to see if we already have the binary
+        # Verify that the compilation subprocess did not exit with errors
+        if process.returncode:
+            message = 'Error during compilation. The logs have been sent to the server'
+            raise OpenBenchBuildFailedException(message, comp_output)
+
+        # Move the binary to the proper out_path, account for Windows and cross-drive moves
+        if check_for_engine_binary(bin_path):
+            shutil.move(check_for_engine_binary(bin_path), os.path.dirname(out_path))
+
+    # Check to see if we have the binary
     if check_for_engine_binary(out_path):
-        return check_for_engine_binary(out_path)
+        return os.path.basename(check_for_engine_binary(out_path))
 
     # Someone should catch this, and possibly report it to the OpenBench server
-    raise OpenBenchBuildFailedException(comp_output)
+    message = 'Error during compilation. The logs have been sent to the server'
+    raise OpenBenchBuildFailedException(message, comp_output)
 
-def download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flags, compiler=None):
+def download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flags):
 
     # Check to see if we already have the binary
     if check_for_engine_binary(out_path):
         print('Found [%s-%s]' % (engine, branch))
-        return check_for_engine_binary(out_path)
+        return os.path.basename(check_for_engine_binary(out_path))
 
     # Pick the best artifact to match this machine
     headers   = read_git_credentials(engine)
@@ -262,7 +358,7 @@ def download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flag
         print('Fetching [%s-%s]' % (engine, branch))
 
         # Download the zip file from Github
-        zip_path = os.path.join(temp_dir, '%s-%s' % (engine, branch))
+        zip_path = os.path.join(temp_dir, '%s-tmp' % (engine))
         with open(zip_path, 'wb') as zip_file:
             zip_file.write(requests.get(best['archive_download_url'], headers=headers).content)
 
@@ -275,9 +371,13 @@ def download_private_engine(engine, branch, source, out_path, cpu_name, cpu_flag
         unzip_root = os.path.join(unzip_path, os.listdir(unzip_path)[0])
         shutil.move(unzip_root, out_path)
 
+    # Might not have execution permissions set
+    if platform.system() != 'Windows':
+        os.system('chmod 777 %s\n' % (out_path))
+
     # Check to see if we already have the binary
     if check_for_engine_binary(out_path):
-        return check_for_engine_binary(out_path)
+        return os.path.basename(check_for_engine_binary(out_path))
 
     # Someone should catch this, and possibly report it to the OpenBench server
-    raise OpenBenchMissingArtifactExceptionException('Failed to fetch %s' % (best['name']))
+    raise OpenBenchMissingArtifactException(best['name'], artifacts)
