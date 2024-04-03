@@ -936,29 +936,19 @@ def server_request_workload(config):
     if 'Bad Client Version' in response.get('error', ''):
         raise BadVersionException();
 
-    if response_object.ok:
-        response = response_object.json()
+    # The 'error' header is included if there was an issue
+    if 'error' in response:
+        raise Exception('[Error] %s' % (response['error']))
 
-        # Throw all the way back to the client.py
-        if 'Bad Client Version' in response.get('error', ''):
-            raise BadVersionException();
+    # Log the start of a new Workload
+    if 'workload' in response:
+        dev_engine  = response['workload']['test']['dev' ]['engine']
+        dev_name    = response['workload']['test']['dev' ]['name'  ]
+        base_engine = response['workload']['test']['base']['engine']
+        base_name   = response['workload']['test']['base']['name'  ]
+        print('Workload [%s] %s vs [%s] %s\n' % (dev_engine, dev_name, base_engine, base_name))
 
-        # The 'error' header is included if there was an issue
-        if 'error' in response:
-            raise Exception('[Error] %s' % (response['error']))
-
-        # Log the start of a new Workload
-        if 'workload' in response:
-            dev_engine  = response['workload']['test']['dev' ]['engine']
-            dev_name    = response['workload']['test']['dev' ]['name'  ]
-            base_engine = response['workload']['test']['base']['engine']
-            base_name   = response['workload']['test']['base']['name'  ]
-            print('Workload [%s] %s vs [%s] %s\n' % (dev_engine, dev_name, base_engine, base_name))
-
-        config.workload = response.get('workload', None)
-    else:
-        config.workload = None
-
+    config.workload = response.get('workload', None)
 
 def complete_workload(config):
 
