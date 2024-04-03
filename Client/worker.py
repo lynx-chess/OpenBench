@@ -885,6 +885,7 @@ def parse_bench_output(stream):
 def run_bench(engine, outqueue, private_net=None):
 
     try:
+        #print('./' + engine)
         # We may need to set an EvalFile via the UCI Options
         if not private_net: cmd = ['./' + engine, 'bench', 'quit']
         else: cmd = ['./' + engine, 'setoption name EvalFile value %s' % (private_net), 'bench', 'quit']
@@ -1086,8 +1087,8 @@ def complete_workload(config):
     # Scale using the base factor only, in the event of a cross-engine test
     dev_engine    = config.workload['test']['dev' ]['engine']
     base_engine   = config.workload['test']['base']['engine']
-    # scale_factor  = base_factor if dev_engine != base_engine else avg_factor
-    scale_factor  = 1
+    scale_factor  = base_factor if dev_engine != base_engine else avg_factor
+    #scale_factor  = 1
 
     # Server knows how many copies of Cutechess we should run
     cutechess_cnt   = config.workload['distribution']['cutechess-count']
