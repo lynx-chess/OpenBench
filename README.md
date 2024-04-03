@@ -44,12 +44,18 @@ python3 manage.py migrate --run-syncdb
 [Quoting Andrew](https://discord.com/channels/759496923324874762/1157627941635764314/1216551094893805598)
 
 ### Backup
+
+```bash
 python3 manage.py dumpdata > backup.datetime.json
+```
 
 ### Update to latest
+
+```bash
 git pull
 python3 manage.py makemigrations
 python3 manage.py migrate
+```
 
 ## Test/experiment
 
