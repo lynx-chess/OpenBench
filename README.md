@@ -33,11 +33,23 @@ DJANGO_CSRF_COOKIE_SECURE=1
 Entering the container created using `docker compose up`.
 
 ```bash
-docker exect -it <container-id> bash
+docker exec -it <container-id> bash
 python3 manage.py migrate
 python3 manage.py makemigrations
 python3 manage.py migrate --run-syncdb
 ```
+
+## Update
+
+[Quoting Andrew](https://discord.com/channels/759496923324874762/1157627941635764314/1216551094893805598)
+
+### Backup
+python3 manage.py dumpdata > backup.datetime.json
+
+### Update to latest
+git pull
+python3 manage.py makemigrations
+python3 manage.py migrate
 
 ## Test/experiment
 
