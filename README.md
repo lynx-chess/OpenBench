@@ -57,6 +57,33 @@ python3 manage.py makemigrations
 python3 manage.py migrate
 ```
 
+### Removing old logs/events
+
+Info from [here](https://discord.com/channels/759496923324874762/1157627941635764314/1225048320167247912)
+
+>you can start by deleting any error/event text file in Media/, then you can do this:
+
+```bash
+$ python3 manage.py shell
+\>>> from OpenBench.models import LogEvent
+\>>> LogEvent.objects.all().delete()
+```
+
+> If you are using an sqlite3 database by default, and the size does not change, I'll provide more steps.
+
+> **Please make a copy of your databse before you do this**
+
+```bash
+$ python3 manage.py shell
+
+>>> from OpenBench.models import LogEvent
+>>> LogEvent.objects.all().delete()
+>>> from django.db import connection
+>>> with connection.cursor() as cursor:
+>>>    cursor.execute("VACUUM;")
+```
+
+
 ## Test/experiment
 
 Using python docker image.
