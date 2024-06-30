@@ -51,6 +51,7 @@ from client import try_forever
 from utils import *
 from pgn_util import compress_list_of_pgns
 from genfens import create_genfens_opening_book
+from pathlib import Path
 
 ## Basic configuration of the Client. These timeouts can be changed at will
 
