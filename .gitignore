@@ -21,6 +21,7 @@ certs/
 !Client/*.py
 !Client/cutechess-ob
 !Client/cutechess-ob.exe
+!Client/Dockerfile
 
 Media/PGNs/*
 Media/Networks/*
