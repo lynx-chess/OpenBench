@@ -1,3 +1,4 @@
+
 # OpenBench
 
 Fork from [AndyGrant/OpenBench](https://github.com/AndyGrant/OpenBench) with the purpose of testing Lynx chess engine.
