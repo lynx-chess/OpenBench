@@ -311,15 +311,24 @@ def download_public_engine(engine, net_path, branch, source, make_path, out_path
         with open(zip_path, 'wb') as zip_file:
             zip_file.write(requests.get(source).content)
 
+        print("Engine sources downloaded")
+        print(zip_path)
+
         # Unzip the engine to a directory called <engine>
         unzip_path = os.path.join(temp_dir, engine)
         with zipfile.ZipFile(zip_path, 'r') as zip_file:
             zip_file.extractall(unzip_path)
 
+        print("Engine unzipped")
+        print(unzip_path)
+
         # Rename the Root folder for ease of conventions
         unzip_root = os.path.join(unzip_path, os.listdir(unzip_path)[0])
         src_path   = os.path.join(unzip_path, '%s-tmp' % (engine))
         os.rename(unzip_root, src_path)
+
+        print("Folder renamed")
+        print(src_path)
 
         # Prepare the MAKEFILE command
         make_path = os.path.join(src_path, make_path)
@@ -330,12 +339,16 @@ def download_public_engine(engine, net_path, branch, source, make_path, out_path
         process     = subprocess.Popen(make_cmd, cwd=make_path, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         comp_output = process.communicate()[0].decode('utf-8')
 
+        print("Make output:")
+        print(comp_output)
+
         # Verify that the compilation subprocess did not exit with errors
         if process.returncode:
             message = 'Error during compilation. The logs have been sent to the server'
             raise OpenBenchBuildFailedException(message, comp_output)
 
         # Move the binary to the proper out_path, account for Windows and cross-drive moves
+        print("Moving binary from %s to %s" % (bin_path, os.path.dirname(out_path)))
         if check_for_engine_binary(bin_path):
             shutil.move(check_for_engine_binary(bin_path), os.path.dirname(out_path))
 

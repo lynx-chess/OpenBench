@@ -1066,6 +1066,9 @@ def safe_download_engine(config, branch, net_path):
     bin_name = engine_binary_name(engine, commit_sha, net_path, private)
     out_path = os.path.join('Engines', bin_name)
 
+    print("Expected path before download:")
+    print(out_path)
+
     if private:
 
         try:
@@ -1113,6 +1116,7 @@ def safe_run_benchmarks(config, branch, engine, network):
 
     try:
         print('\nRunning %dx Benchmarks for %s' % (config.threads, name))
+        print(binary)
         speed, nodes = bench.run_benchmark(
             binary, network, private, config.threads, 1, expected)
 
