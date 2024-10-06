@@ -1,6 +1,6 @@
 {
     "private": false,
-    "nps": 750000,
+    "nps": 765000,
     "source": "https://github.com/lynx-chess/Lynx",
     "base": "main",
     "build": {
