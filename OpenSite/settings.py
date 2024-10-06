@@ -19,8 +19,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.0/howto/deployment/checklist/
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECURITY WARNING: don't run with debug turned on in production!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '<N0tA$3c73t>')
-DEBUG = bool(os.environ.get('DJANGO_DEBUG', default=0))
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+DEBUG = os.environ.get('DJANGO_DEBUG', default='False').lower() == 'true'
 
 ALLOWED_HOSTS = ['*']
 
@@ -157,8 +157,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Security
 
 SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = bool(os.environ.get('DJANGO_SESSION_COOKIE_SECURE', default=0))
-CSRF_COOKIE_SECURE = bool(os.environ.get('DJANGO_CSRF_COOKIE_SECURE', default=0))
+SESSION_COOKIE_SECURE = os.environ.get('DJANGO_SESSION_COOKIE_SECURE', default='False').lower() == 'true'
+CSRF_COOKIE_SECURE = os.environ.get('DJANGO_CSRF_COOKIE_SECURE', default='False').lower() == 'true'
 # CSRF_TRUSTED_ORIGINS = ["http://localhost:1337"]
 CSRF_TRUSTED_ORIGINS = ["https://openbench.lynx-chess.com"]
 
