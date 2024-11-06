@@ -120,7 +120,7 @@ def run_benchmark(binary, network, private, threads, sets, expected=None):
             benches.append(bench); speeds.append(speed)
 
     if len(set(benches)) != 1:
-        raise OpenBenchBadBenchException('[%s] Non-Deterministic Benches' % (engine))
+        raise OpenBenchBadBenchException('[%s] Non-Deterministic Benches: %s' % (engine, repr(set(benches))))
 
     if None in benches or None in speeds:
         raise OpenBenchBadBenchException('[%s] Failed to Execute Benchmark' % (engine))
