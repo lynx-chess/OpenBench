@@ -21,7 +21,7 @@
             "book_name": "UHO_Lichess_4852_v1.epd",
             "test_bounds": "[0.00, 3.00]",
             "test_confidence": "[0.10, 0.05]",
-            "win_adj": "movecount=3 score=500 twosided=true",
+            "win_adj": "movecount=3 score=400 twosided=true",
             "draw_adj": "movenumber=40 movecount=8 score=10"
         },
         "STC": {
@@ -76,7 +76,7 @@
     "tune_presets": {
         "default": {
             "book_name": "UHO_Lichess_4852_v1.epd",
-            "win_adj": "movecount=3 score=500 twosided=true",
+            "win_adj": "movecount=3 score=400 twosided=true",
             "draw_adj": "movenumber=40 movecount=8 score=10"
         }
     },
