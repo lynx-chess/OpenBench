@@ -232,7 +232,7 @@ function change_engine(engine, target, workload_type) {
         set_engine(engine, 'base');
 
     set_option('scale_nps', config.engines[engine].nps);
-    set_option('scale_method', workload_type == 'TUNE' ? 'DEV' : 'BASE');
+    set_option('scale_method', workload_type == 'TUNE' ? 'DEV' : 'BOTH');
 
     apply_preset('STC', workload_type);
 }
