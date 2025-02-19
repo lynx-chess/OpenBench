@@ -25,3 +25,5 @@ certs/
 Media/PGNs/*
 Media/Networks/*
 Media/Events/*
+
+*.lock

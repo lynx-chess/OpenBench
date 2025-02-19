@@ -38,8 +38,9 @@ import subprocess
 import time
 import multiprocessing
 
-from utils import kill_process_by_name
-from utils import OpenBenchFailedGenfensException
+## Local imports must only use "import x", never "from x import ..."
+
+import utils
 
 def genfens_required_openings_each(config):
 
@@ -101,8 +102,8 @@ def genfens_single_threaded(command, queue):
 
 def genfens_progress_bar(curr, total):
 
-    prev_progress = int(50 * (curr - 1) / total)
-    curr_progress = int(50 * (curr - 0) / total)
+    prev_progress = 50 * (curr - 1) // total
+    curr_progress = 50 * (curr - 0) // total
 
     if curr_progress != prev_progress:
         bar_text = '=' * curr_progress + ' ' * (50 - curr_progress)
@@ -140,8 +141,8 @@ def create_genfens_opening_book(config, binary_name, network):
                 genfens_progress_bar(iteration+1, N * config.threads)
 
         except queue.Empty: # Force kill the engine, thus causing the processes to finish
-            kill_process_by_name(binary_name)
-            raise OpenBenchFailedGenfensException('[%s] Stalled during genfens' % (binary_name))
+            utils.kill_process_by_name(binary_name)
+            raise utils.OpenBenchFailedGenfensException('[%s] Stalled during genfens' % (binary_name))
 
         finally: # Join everything to avoid zombie processes
             for process in processes:
