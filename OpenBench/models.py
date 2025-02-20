@@ -126,7 +126,7 @@ class Test(Model):
     throughput    = IntegerField(default=0)
 
     # Scaling Mechanisms
-    scale_method  = CharField(max_length=16, choices=ScaleMethod.choices, default=ScaleMethod.BOTH)
+    scale_method  = CharField(max_length=16, choices=ScaleMethod.choices, default=ScaleMethod.BASE)
     scale_nps     = IntegerField(default=0)
 
     # Tablebases and Cutechess adjudicatoins
