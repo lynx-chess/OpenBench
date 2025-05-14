@@ -14,7 +14,8 @@
         "DFRC.epd",
         "Endgames.epd",
         "Pohl.pgn",
-        "UHO_Lichess_4852_v1.epd"
+        "UHO_Lichess_4852_v1.epd",
+        "fortresses_150_250.epd"
     ],
 
     "engines" : [
