@@ -56,7 +56,7 @@ def gitDiffLink(test):
         return OpenBench.utils.path_join(repo, 'compare', test.dev.sha[:8])
 
     return OpenBench.utils.path_join(repo, 'compare',
-        '{0}..{1}'.format( test.base.sha[:8], test.dev.sha[:8]))
+        '{0}..{1}?w=1'.format( test.base.sha[:8], test.dev.sha[:8]))
 
 def shortStatBlock(test):
 
