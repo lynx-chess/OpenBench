@@ -16,6 +16,7 @@ services:
       - ./OpenBench/migrations:/home/app/web/OpenBench/migrations
       - static_volume:/home/app/web/staticfiles
       - ./media:/home/app/web/media
+      - ./Media:/home/app/web/Media
   nginx:
     build: ./nginx
     volumes:

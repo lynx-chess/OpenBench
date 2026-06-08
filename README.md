@@ -9,8 +9,8 @@ Using `docker compose`.
 ```bash
 docker compose up -d --build --force-recreate
 # or
-sudo docker compose -f docker-compose.prod.yaml up -d --build && sudo chown -R $(sudo docker compose exec web id -u) ./db && sudo chown -R $(sudo docker compose exec web id -u) ./media && sudo chown -R $(sudo docker compose exec web id -u) ./OpenBench/migrations
-# Includes workaround of changing owner of media/ so that the app can save files there
+sudo docker compose -f docker-compose.prod.yaml up -d --build && sudo chown -R $(sudo docker compose exec web id -u) ./db && sudo chown -R $(sudo docker compose exec web id -u) ./media && sudo chown -R $(sudo docker compose exec web id -u) ./OpenBench/migrations && sudo chown -R $(sudo docker compose exec web id -u) ./Media
+# Includes workaround of changing owner of db/, media/ and Media/ so that the app can save files there
 
 # To stop it:
 docker compose down -v --remove-orphans --rmi local
