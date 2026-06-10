@@ -109,7 +109,7 @@
             "win_adj": "None",
             "draw_adj": "None",
             "workload_size": 128,
-            "both_options": "Threads=1 Hash=32 SoftNodes=true",
+            "both_options": "Threads=1 Hash=32 SoftNodes=true Minimal=true",
             "datagen_max_games": "1000000"
         },
         "5k Nodes" : {
