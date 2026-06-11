@@ -189,3 +189,6 @@ CSRF_TRUSTED_ORIGINS = ["https://openbench.lynx-chess.com"]
 #     'x-csrftoken',
 #     'x-requested-with',
 # ]
+
+# 50MB, instead of the default 2.5MB, to allow for larger file uploads (e.g., PGN files)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760
