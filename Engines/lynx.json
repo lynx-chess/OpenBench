@@ -1,6 +1,6 @@
 {
     "private": false,
-    "nps": 850000,
+    "nps": 1400000,
     "source": "https://github.com/lynx-chess/Lynx",
     "base": "main",
     "build": {
@@ -106,13 +106,17 @@
     },
     "datagen_presets" : {
         "default" : {
-            "win_adj"       : "None",
-            "draw_adj"      : "None",
-            "workload_size" : 128
+            "win_adj": "None",
+            "draw_adj": "None",
+            "workload_size": 128,
+            "both_options": "Threads=1 Hash=32 SoftNodes=true Minimal=true",
+            "datagen_max_games": "1000000"
         },
-        "40k Nodes" : {
-            "both_options"      : "Threads=1 Hash=16",
-            "both_time_control" : "N=40000"
+        "5k Nodes" : {
+            "both_time_control" : "N=5000"
+        },
+        "20k Nodes" : {
+            "both_time_control" : "N=20000"
         }
     }
 }

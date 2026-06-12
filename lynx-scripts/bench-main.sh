@@ -6,4 +6,4 @@ nproc
 
 export DOTNET_gcServer=0
 
-python3 ~/OpenBench/Scripts/bench_all.py -U eduherminio -P "<pwd>" -S https://openbench.lynx-chess.com/ --rebuild --threads 4  --sets 10
+Client/.venv/bin/python3 Scripts/bench_all.py -U eduherminio -P "<pwd>" -S https://openbench.lynx-chess.com/ --rebuild --threads 4  --sets 10
