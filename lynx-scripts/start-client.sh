@@ -6,7 +6,7 @@ nproc
 
 export DOTNET_gcServer=0
 
-python3 ./Client/Client.py -U eduherminio -P "<pwd>" -S https://openbench.lynx-chess.com/ -T 3 -N 1 -I ob-worker-n
+python3 ./Client/client.py -U eduherminio -P "<pwd>" -S https://openbench.lynx-chess.com/ -T 3 -N 1 -I ob-worker-n
 # Client/.venv/bin/python3 Client/client.py
 
 # https://vipinyadav.com/blog/scripts-run-in-background-using-screen-detached-mode/
