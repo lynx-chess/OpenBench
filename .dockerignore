@@ -1,5 +1,6 @@
 db/
 media/
+Media/
 docker-compose.yaml
 run.sh
 Dockerfile
@@ -7,3 +8,4 @@ Dockerfile
 .env
 .env.prod
 .env.dev
+.git/
