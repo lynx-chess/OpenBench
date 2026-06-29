@@ -9,8 +9,8 @@ Using `docker compose`.
 ```bash
 docker compose up -d --build --force-recreate
 # or
-sudo docker compose -f docker-compose.prod.yaml up -d --build && sudo chown -R $(sudo docker compose exec web id -u) ./db && sudo chown -R $(sudo docker compose exec web id -u) ./media && sudo chown -R $(sudo docker compose exec web id -u) ./OpenBench/migrations && sudo chown -R $(sudo docker compose exec web id -u) ./Media
-# Includes workaround of changing owner of db/, media/ and Media/ so that the app can save files there
+sudo docker compose -f docker-compose.prod.yaml up -d --build && sudo chown -R $(sudo docker compose exec web id -u) ./db && sudo chown -R $(sudo docker compose exec web id -u) ./media && sudo chown -R $(sudo docker compose exec web id -u) ./OpenBench/migrations
+# Includes workaround of changing owner of db/, media/ so that the app can save files there
 
 # To stop it:
 docker compose down -v --remove-orphans --rmi local
@@ -61,7 +61,7 @@ python3 manage.py migrate
 
 Info from [here](https://discord.com/channels/759496923324874762/1157627941635764314/1225048320167247912)
 
->you can start by deleting any error/event text file in Media/, then you can do this:
+>you can start by deleting any error/event text file in media/, then you can do this:
 
 ```bash
 $ python3 manage.py shell

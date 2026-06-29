@@ -317,7 +317,7 @@ def network_upload(request, engine, name):
     if engine not in OPENBENCH_CONFIG['engines'].keys():
         return OpenBench.views.redirect(request, '/networks/', error='No Engine found with matching name')
 
-    # Save the file locally into /Media/ if we don't already have this file
+    # Save the file locally into /media/ if we don't already have this file
     if not Network.objects.filter(sha256=sha256):
         FileSystemStorage().save('%s' % (sha256), netfile)
 

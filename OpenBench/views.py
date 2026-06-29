@@ -727,7 +727,7 @@ def client_submit_error(request, machine):
         machine_id = int(request.POST['machine_id']),
         test_id    = int(request.POST['test_id']))
 
-    # Save the Logs to /Media/ to be viewed later
+    # Save the Logs to /media/ to be viewed later
     logfile = ContentFile(request.POST['logs'])
     FileSystemStorage().save('event%d.log' % (event.id), logfile)
     event.log_file = 'event%d.log' % (event.id); event.save()
@@ -765,7 +765,7 @@ def client_submit_pgn(request, machine):
         pgn.book_index = int(request.POST['book_index'])
         pgn.save()
 
-        # Save the .pgn.bz2 to /Media/
+        # Save the .pgn.bz2 to /media/
         FileSystemStorage().save(pgn.filename(), ContentFile(request.FILES['file'].read()))
 
     return JsonResponse({})

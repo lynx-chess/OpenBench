@@ -199,7 +199,7 @@ class LogEvent(Model):
 
     author     = CharField(max_length=128) # Username for the OpenBench Profile
     summary    = CharField(max_length=128) # Quick summary of the Event or Error
-    log_file   = CharField(max_length=128) # .log file stored in /Media/
+    log_file   = CharField(max_length=128) # .log file stored in /media/
 
     machine_id = IntegerField(default=0)   # Only set for Client based Log Events
     test_id    = IntegerField(default=0)   # Should always be set
