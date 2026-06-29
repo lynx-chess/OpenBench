@@ -26,7 +26,7 @@ import traceback
 
 from OpenSite.settings import PROJECT_PATH
 
-OPENBENCH_STATIC_VERSION = 'v5-lynx'
+OPENBENCH_STATIC_VERSION = 'v6'
 
 OPENBENCH_CONFIG          = None # Initialized by OpenBench/apps.py
 OPENBENCH_CONFIG_CHECKSUM = None # Initialized by OpenBench/apps.py
@@ -178,6 +178,12 @@ def verify_engine_test_preset(test_preset):
 def verify_engine_tune_preset(tune_preset):
 
     valid_keys = [
+
+        'both_branch',
+        'both_bench',
+        'both_network',
+        'both_options',
+        'both_time_control',
 
         'dev_branch',
         'dev_bench',
