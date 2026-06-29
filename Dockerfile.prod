@@ -11,6 +11,10 @@ ENV PYTHONDONTWRITEBYTECODE 1
 # Prevents Python from buffering stdout and stderr (equivalent to python -u option)
 ENV PYTHONUNBUFFERED 1
 
+# Fix 'The repository http://deb.debian.org/debian buster Release does not have a Release file.
+# https://unix.stackexchange.com/questions/371890/debian-the-repository-does-not-have-a-release-file
+RUN echo "deb http://archive.debian.org/debian stretch main contrib non-free" > /etc/apt/sources.list
+
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc
