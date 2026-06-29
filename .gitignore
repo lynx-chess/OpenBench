@@ -28,3 +28,6 @@ Media/Events/*
 
 *.lock
 *.epd
+
+start-client.sh
+start-client.ps1
