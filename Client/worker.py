@@ -61,7 +61,7 @@ from pathlib import Path
 ## Basic configuration of the Client. These timeouts can be changed at will
 
 CLIENT_VERSION   = 37 # Client version to send to the Server
-TIMEOUT_HTTP     = 300 # Timeout in seconds for HTTP requests
+TIMEOUT_HTTP     = 600 # Timeout in seconds for HTTP requests
 TIMEOUT_ERROR    = 10 # Timeout in seconds when any errors are thrown
 TIMEOUT_WORKLOAD = 30 # Timeout in seconds between workload requests
 REPORT_INTERVAL  = 30 # Seconds between reports to the Server

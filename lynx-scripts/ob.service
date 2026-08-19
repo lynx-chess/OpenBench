@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenBench service
+Wants=network.target
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+Restart=on-failure
+RestartSec=10
+User=edu
+WorkingDirectory=/home/edu/dev/OpenBench
+ExecStart=/home/edu/dev/OpenBench/start-client.sh
+
+[Install]
+WantedBy=multi-user.target
