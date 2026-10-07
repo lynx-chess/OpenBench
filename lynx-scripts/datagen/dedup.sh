@@ -27,6 +27,10 @@ awk -F';' '
     } else {
         duplicates++
     }
+
+    if (total % 1000000 == 0) {
+        printf("Processed %d lines...\n", total) > "/dev/stderr"
+    }
 }
 END {
     if (total > 0)
