@@ -131,8 +131,8 @@ def workload_uses_time_based_tc(workload):
     base_type = TimeControl.control_type(workload.base_time_control)
 
     return  workload.upload_pgns == 'VERBOSE' \
-       or (dev_type  != TimeControl.FIXED_NODES and dev_type  != TimeControl.FIXED_DEPTH) \
-       or (base_type != TimeControl.FIXED_NODES and base_type != TimeControl.FIXED_DEPTH)
+       or (dev_type  != TimeControl.FIXED_NODES) \
+       or (base_type != TimeControl.FIXED_NODES)
 
 
 def read_git_credentials(engine):
