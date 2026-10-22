@@ -10,5 +10,5 @@ docker run -it --rm \
   --mount type=volume,dst=/ob/db \
   -w /ob \
   -p 8001:8000 \
-  python:3.15.1-slim \
+  python:3.11-slim \
   bash

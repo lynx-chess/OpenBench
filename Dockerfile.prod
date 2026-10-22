@@ -1,7 +1,7 @@
 ############################################################
 # Builder
 ############################################################
-FROM --platform=$BUILDPLATFORM python:3.15.1-slim AS builder
+FROM --platform=$BUILDPLATFORM python:3.11-slim-buster AS builder
 
 WORKDIR /usr/src/app
 
@@ -21,13 +21,12 @@ RUN apt-get update && \
 
 # Install python dependencies
 COPY ./requirements.txt .
-RUN pip install --upgrade pip
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
 ############################################################
 # Setup OpenBench
 ############################################################
-FROM --platform=$BUILDPLATFORM python:3.15.1-slim
+FROM --platform=$BUILDPLATFORM python:3.11-slim-buster
 
 WORKDIR /app
 

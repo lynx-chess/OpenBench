@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM python:3.15.1-slim AS builder
+FROM --platform=$BUILDPLATFORM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED 1
 # Install dependencies
 RUN pip install --upgrade pip
 COPY requirements.txt /app
-RUN pip install -r requirements.txt --no-cache-dir
+RUN pip3 install -r requirements.txt --no-cache-dir
 
 # Copy project
 COPY . /app
