@@ -31,7 +31,9 @@ WORKDIR /app
 RUN mkdir -p /home/app
 
 # Create the app user
-RUN addgroup --system app && adduser --system --group app
+# The uid/gid are pinned to 101, which is what python:*-slim-buster assigned. Debian's allocation changed in trixie (uid 100),
+# and the existing `static_volume` and the bind mounts (db/, media/) are already owned by 101
+RUN addgroup --system --gid 101 app && adduser --system --uid 101 --gid 101 app
 
 # Create the appropriate directories
 # We need to create /staticfiles now or `collectstatic` won't work as a non-root user with volumes created as root
