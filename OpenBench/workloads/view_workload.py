@@ -60,8 +60,6 @@ def view_workload(request, workload, workload_type):
 def is_active(result):
 
     # One minute prior to now
-    target = datetime.datetime.utcnow()
-    target = target.replace(tzinfo=timezone.utc)
-    target = target - datetime.timedelta(minutes=1)
+    target = timezone.now() - datetime.timedelta(minutes=1)
 
     return result.test.id == result.machine.workload and result.machine.updated >= target
