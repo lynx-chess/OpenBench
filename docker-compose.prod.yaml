@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile.prod
-    command: gunicorn OpenSite.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn OpenSite.wsgi:application --bind 0.0.0.0:8000 --no-control-socket
     expose:
       - 8000
     restart: always
