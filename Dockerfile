@@ -10,7 +10,8 @@ ENV PYTHONUNBUFFERED=1
 
 # Install dependencies
 # https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
-RUN pip install --upgrade "pip>=26.2.2"
+# The offline check fails the build if the base image's pip is older, so an unsafe pip never downloads anything
+RUN pip install --no-index --dry-run "pip>=26.2.2" && pip install --upgrade pip
 
 COPY requirements.txt /app
 RUN pip3 install -r requirements.txt --no-cache-dir

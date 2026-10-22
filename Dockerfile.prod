@@ -20,7 +20,8 @@ RUN apt-get update && \
 COPY ./requirements.txt .
 
 # https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
-RUN pip install --upgrade "pip>=26.2.2"
+# The offline check fails the build if the base image's pip is older, so an unsafe pip never downloads anything
+RUN pip install --no-index --dry-run "pip>=26.2.2" && pip install --upgrade pip
 
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
@@ -54,7 +55,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
-RUN pip install --upgrade "pip>=26.2.2"
+
+# https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
+# The offline check fails the build if the base image's pip is older, so an unsafe pip never downloads anything
+RUN pip install --no-index --dry-run "pip>=26.2.2" && pip install --upgrade pip
+
 RUN pip install --no-cache /wheels/*
 
 # Copy entrypoint.prod.sh
