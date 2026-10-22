@@ -9,7 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install dependencies
-RUN pip install --upgrade pip
+# https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
+RUN pip install --upgrade "pip>=26.2.2"
+
 COPY requirements.txt /app
 RUN pip3 install -r requirements.txt --no-cache-dir
 

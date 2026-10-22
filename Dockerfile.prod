@@ -18,7 +18,10 @@ RUN apt-get update && \
 
 # Install python dependencies
 COPY ./requirements.txt .
-RUN pip install --upgrade pip
+
+# https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
+RUN pip install --upgrade "pip>=26.2.2"
+
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
 ############################################################
@@ -51,7 +54,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
-RUN pip install --upgrade pip
+RUN pip install --upgrade "pip>=26.2.2"
 RUN pip install --no-cache /wheels/*
 
 # Copy entrypoint.prod.sh
