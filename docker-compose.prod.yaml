@@ -16,6 +16,7 @@ services:
       - ./media:/home/app/web/media
   nginx:
     build: ./nginx
+    pull: true
     volumes:
       - ./certs/lynx-chess.com:/etc/nginx/ssl/live/lynx-chess.com:ro
       - static_volume:/home/app/web/staticfiles
