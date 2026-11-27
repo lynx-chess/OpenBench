@@ -1,12 +1,12 @@
 {
     "private": false,
-    "nps": 1200000,
+    "nps": 205000,
     "source": "https://github.com/lynx-chess/Lynx",
     "base": "main",
     "build": {
         "path": "",
         "compilers": [
-            "dotnet>=10.0.100"
+            "dotnet>=11.0.100"
         ],
         "systems": [
             "Linux",
